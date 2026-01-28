@@ -38,6 +38,7 @@ clawdbot gateway --port 18789 --verbose
 ```
 
 脚本会提示输入 Server URL 与 Token，并自动写入配置（无需再跑 onboard）。
+如需覆盖已安装插件，可设置：`VIMALINX_FORCE_OVERWRITE=1 ./install.sh`。
 
 或手动安装并配置插件：
 

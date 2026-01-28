@@ -38,6 +38,7 @@ Install + configure the plugin (one-liner after clone):
 ```
 
 The script prompts for Server URL + token and writes the config (no onboard needed).
+To overwrite an existing install: `VIMALINX_FORCE_OVERWRITE=1 ./install.sh`.
 
 Or install manually:
 

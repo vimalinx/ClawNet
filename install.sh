@@ -24,6 +24,15 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 echo "Installing Vimalinx Server plugin to: ${TARGET_DIR}"
+if [[ -d "${TARGET_DIR}" ]]; then
+  if [[ "${TARGET_DIR}" == "${HOME}/.clawdbot/extensions/vimalinx-server-plugin" || "${VIMALINX_FORCE_OVERWRITE:-}" == "1" ]]; then
+    rm -rf "${TARGET_DIR}"
+  else
+    echo "Target already exists: ${TARGET_DIR}" >&2
+    echo "Set VIMALINX_FORCE_OVERWRITE=1 to overwrite." >&2
+    exit 1
+  fi
+fi
 mkdir -p "${TARGET_DIR}"
 if command -v rsync >/dev/null 2>&1; then
   rsync -a --delete "${PLUGIN_DIR}/" "${TARGET_DIR}/"
