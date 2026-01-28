@@ -40,7 +40,7 @@ else
   cp -a "${PLUGIN_DIR}/." "${TARGET_DIR}/"
 fi
 
-clawdbot plugins install "${TARGET_DIR}"
+# Plugins are loaded from ~/.clawdbot/extensions, so no install step needed.
 clawdbot plugins enable vimalinx-server-plugin >/dev/null 2>&1 || true
 
 if [[ -z "${SERVER_URL}" ]]; then
