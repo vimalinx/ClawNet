@@ -17,6 +17,21 @@
 clawdbot plugins install vimalinx-server-plugin
 ```
 
+离线安装包（不走 npm）：
+
+发布方打包：
+
+```bash
+./plugin/scripts/pack-release.sh
+```
+
+客户安装：
+
+```bash
+tar -xzf vimalinx-server-plugin-*.tgz
+./package/scripts/install.sh
+```
+
 从本地仓库安装（开发/调试）：
 
 ```bash

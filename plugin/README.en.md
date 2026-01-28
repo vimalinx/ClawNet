@@ -18,6 +18,21 @@ From npm (recommended for releases):
 clawdbot plugins install vimalinx-server-plugin
 ```
 
+Offline package (no npm):
+
+Packager:
+
+```bash
+./plugin/scripts/pack-release.sh
+```
+
+Customer install:
+
+```bash
+tar -xzf vimalinx-server-plugin-*.tgz
+./package/scripts/install.sh
+```
+
 From a local checkout (dev/debug):
 
 ```bash
