@@ -36,7 +36,7 @@ For a release build:
 1) Start the server (see `server/README.md`).
 2) In Vimagram, register or log in with the server URL and your user ID.
 3) Generate a host token from **Account** and copy it.
-4) In Clawdbot, install/configure the Vimalinx Server plugin
+4) In the gateway CLI, install/configure the Vimalinx Server plugin
    (see `plugin/README.md`) and paste the token.
 
 ## Notes

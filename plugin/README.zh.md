@@ -1,12 +1,12 @@
-# Vimalinx Server 插件（Clawdbot）
+# Vimalinx Server 插件
 
 中文 | [English](README.md)
 
-该插件用于连接 Vimalinx Server，支持轮询（poll）或 webhook 入站模式，并使用 Token 认证。
+该插件用于连接 Gateway 与 Vimalinx Server，支持轮询（poll）或 webhook 入站模式，并使用 Token 认证。
 
 ## 需求
 
-- Clawdbot Gateway（Node 22+）。
+- Gateway 运行中（Node 22+）。
 - 可访问的 Vimalinx Server。
 
 ## 安装

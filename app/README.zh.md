@@ -35,7 +35,7 @@ Release 构建：
 1) 启动服务器（见 `server/README.md`）。
 2) 在 Vimagram 中输入服务器地址，注册或登录。
 3) 在 **Account** 里生成主机 Token 并复制。
-4) 在 Clawdbot 中安装并配置 Vimalinx Server 插件
+4) 在网关 CLI 中安装并配置 Vimalinx Server 插件
    （见 `plugin/README.md`），粘贴 Token。
 
 ## 备注

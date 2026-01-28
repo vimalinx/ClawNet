@@ -1,13 +1,13 @@
-# Vimalinx Server plugin (Clawdbot)
+# Vimalinx Server plugin
 
 English | [中文](README.zh.md)
 
-Channel plugin that connects Clawdbot to a Vimalinx Server. Supports poll or
+Channel plugin that connects the Gateway to a Vimalinx Server. Supports poll or
 webhook inbound modes and token-based auth.
 
 ## Requirements
 
-- Clawdbot Gateway running (Node 22+).
+- Gateway running (Node 22+).
 - Vimalinx Server reachable at a base URL.
 
 ## Install
