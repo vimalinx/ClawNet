@@ -20,6 +20,7 @@ class TestChatPrefs(context: Context) {
     private const val hostsKey = "testchat.hosts"
     private const val legacyTokenKey = "testchat.token"
     private const val lastEventIdsKey = "testchat.lastEventIds"
+    private const val languageKey = "testchat.language"
   }
 
   private val json = Json { ignoreUnknownKeys = true }
@@ -46,6 +47,9 @@ class TestChatPrefs(context: Context) {
 
   private val _hosts = MutableStateFlow(loadHosts())
   val hosts: StateFlow<List<TestChatHost>> = _hosts
+
+  private val _languageTag = MutableStateFlow(loadLanguageTag())
+  val languageTag: StateFlow<String> = _languageTag
 
   private val lastEventIds = loadLastEventIds().toMutableMap()
 
@@ -89,6 +93,14 @@ class TestChatPrefs(context: Context) {
     _password.value = null
     _hosts.value = emptyList()
     lastEventIds.clear()
+  }
+
+  fun saveLanguageTag(tag: String) {
+    val normalized = tag.trim().ifBlank { "system" }
+    prefs.edit {
+      putString(languageKey, normalized)
+    }
+    _languageTag.value = normalized
   }
 
   fun getLastEventId(hostLabel: String): Long? {
@@ -152,5 +164,9 @@ class TestChatPrefs(context: Context) {
       if (parsed != null) return parsed
     }
     return emptyMap()
+  }
+
+  private fun loadLanguageTag(): String {
+    return prefs.getString(languageKey, "system")?.trim().orEmpty().ifBlank { "system" }
   }
 }

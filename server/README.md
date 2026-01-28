@@ -1,6 +1,21 @@
 # Vimalinx Server
 
+English | [中文](README.zh.md)
+
 Minimal chat server for the Vimalinx Server channel plugin (`test`).
+
+## Quick start (local, poll mode)
+
+```bash
+export TEST_SERVER_PORT=8788
+export TEST_USERS_FILE=/path/to/vimalinx-users.json
+export TEST_ALLOW_REGISTRATION=true
+
+node server/server.mjs
+```
+
+- `TEST_USERS_FILE` is required to persist registrations.
+- Poll mode is default; the plugin will poll `/api/poll`.
 
 ## Config
 
@@ -21,6 +36,21 @@ Set environment variables:
 - `TEST_REQUIRE_SIGNATURE` (`true` or `false`, default `true` when secret is set)
 - `TEST_SIGNATURE_TTL_MS` (signature timestamp window, default `300000`)
 
+## Webhook mode
+
+Set the inbound mode to webhook and point the server at the Gateway webhook URL:
+
+```bash
+export TEST_INBOUND_MODE=webhook
+export TEST_GATEWAY_URL=https://gateway-host:18789/test-webhook
+```
+
+Notes:
+- Use HTTPS for public deployments.
+- `TEST_GATEWAY_URL` can be set per user in the users file (`gatewayUrl`).
+- When `TEST_HMAC_SECRET` is set, requests are signed. Set
+  `TEST_REQUIRE_SIGNATURE=true` to enforce signatures.
+
 User file example (multi-gateway):
 
 ```json
@@ -30,7 +60,7 @@ User file example (multi-gateway):
       "id": "alice",
       "token": "alice-token",
       "displayName": "Alice",
-      "gatewayUrl": "http://100.64.0.11:18789/test-webhook",
+      "gatewayUrl": "https://gateway-host:18789/test-webhook",
       "gatewayToken": "alice-token"
     }
   ]
@@ -46,6 +76,12 @@ Notes:
 ```bash
 node server/server.mjs
 ```
+
+## Deployment notes
+
+- Run behind a process manager (systemd, PM2, etc.) for restarts.
+- Make sure the users file is writable when registrations are enabled.
+- Protect `/send` with `TEST_SERVER_TOKEN` and/or per-user tokens.
 
 ## Endpoints
 

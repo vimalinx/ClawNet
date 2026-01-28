@@ -1,5 +1,8 @@
 package com.clawdbot.android.testchat
 
+import android.app.Activity
+import com.clawdbot.android.AppLocale
+import com.clawdbot.android.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,7 +40,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PushPin
@@ -83,6 +85,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
@@ -108,8 +111,15 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun TestChatApp(viewModel: TestChatViewModel) {
   val state by viewModel.uiState.collectAsState()
+  val languageTag by viewModel.languageTag.collectAsState()
+  val context = LocalContext.current
   var registrationUserId by remember { mutableStateOf<String?>(null) }
   var currentTab by rememberSaveable { mutableStateOf(MainTab.Chat) }
+  LaunchedEffect(languageTag) {
+    if (AppLocale.apply(context, languageTag)) {
+      (context as? Activity)?.recreate()
+    }
+  }
   LaunchedEffect(state.isAuthenticated) {
     if (!state.isAuthenticated) {
       currentTab = MainTab.Chat
@@ -133,7 +143,6 @@ fun TestChatApp(viewModel: TestChatViewModel) {
         state = state,
         onBack = viewModel::backToList,
         onSend = viewModel::sendMessage,
-        onLogout = viewModel::logout,
       )
     } else {
       Scaffold(
@@ -148,6 +157,8 @@ fun TestChatApp(viewModel: TestChatViewModel) {
               AccountDashboardScreen(
                 state = state,
                 onLogout = viewModel::logout,
+                languageTag = languageTag,
+                onLanguageChange = viewModel::setLanguageTag,
               )
             }
             MainTab.Chat -> {
@@ -160,7 +171,8 @@ fun TestChatApp(viewModel: TestChatViewModel) {
                 onTogglePinThread = viewModel::togglePinThread,
                 onToggleArchiveThread = viewModel::toggleArchiveThread,
                 onDeleteThread = viewModel::deleteThread,
-                onLogout = viewModel::logout,
+                onRestoreThread = viewModel::restoreThread,
+                onPurgeThread = viewModel::purgeThread,
               )
             }
           }
@@ -172,15 +184,19 @@ fun TestChatApp(viewModel: TestChatViewModel) {
   if (registrationUserId != null) {
     AlertDialog(
       onDismissRequest = { registrationUserId = null },
-      title = { Text("Account created") },
+      title = { Text(stringResource(R.string.account_created_title)) },
       text = {
         Text(
-          text = "Save this user ID for future logins: ${registrationUserId.orEmpty()}",
+          text =
+            stringResource(
+              R.string.account_created_body,
+              registrationUserId.orEmpty(),
+            ),
         )
       },
       confirmButton = {
         TextButton(onClick = { registrationUserId = null }) {
-          Text("OK")
+          Text(stringResource(R.string.action_ok))
         }
       },
     )
@@ -218,11 +234,16 @@ private fun AccountScreen(
   var showAddServer by remember { mutableStateOf(false) }
   var newServerName by rememberSaveable { mutableStateOf("") }
   var newServerUrl by rememberSaveable { mutableStateOf("") }
+  val defaultServerLabel = stringResource(R.string.default_custom_server_label)
+  val unknownServerLabel = stringResource(R.string.label_unknown_server)
 
   LaunchedEffect(selectedServer) {
     if (serverOptions.none { it.url == selectedServer } && selectedServer.isNotBlank()) {
       serverOptions.add(
-        ServerOption(label = formatServerLabel(selectedServer), url = selectedServer),
+        ServerOption(
+          label = formatServerLabel(selectedServer, unknownServerLabel),
+          url = selectedServer,
+        ),
       )
     }
   }
@@ -250,12 +271,12 @@ private fun AccountScreen(
     ) {
       Spacer(modifier = Modifier.height(12.dp))
       Text(
-        text = "Vimagram",
+        text = stringResource(R.string.app_name),
         style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
         color = MaterialTheme.colorScheme.primary,
       )
       Text(
-        text = "Register or sign in",
+        text = stringResource(R.string.account_welcome),
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -280,24 +301,24 @@ private fun AccountScreen(
           )
           Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = { isLogin = false }) {
-              Text("Register")
+              Text(stringResource(R.string.action_register))
             }
             TextButton(onClick = { isLogin = true }) {
-              Text("Login")
+              Text(stringResource(R.string.action_login))
             }
           }
           if (isLogin) {
             TextField(
               value = loginUserId,
               onValueChange = { loginUserId = it },
-              label = { Text("User ID") },
+              label = { Text(stringResource(R.string.label_user_id)) },
               singleLine = true,
               colors = textFieldColors(),
             )
             TextField(
               value = loginPassword,
               onValueChange = { loginPassword = it },
-              label = { Text("Password") },
+              label = { Text(stringResource(R.string.label_password)) },
               singleLine = true,
               visualTransformation = PasswordVisualTransformation(),
               colors = textFieldColors(),
@@ -307,27 +328,27 @@ private fun AccountScreen(
               modifier = Modifier.fillMaxWidth(),
               enabled = loginUserId.isNotBlank() && loginPassword.isNotBlank(),
             ) {
-              Text("Login")
+              Text(stringResource(R.string.action_login))
             }
           } else {
             TextField(
               value = registerUserId,
               onValueChange = { registerUserId = it },
-              label = { Text("User ID") },
+              label = { Text(stringResource(R.string.label_user_id)) },
               singleLine = true,
               colors = textFieldColors(),
             )
             TextField(
               value = inviteCode,
               onValueChange = { inviteCode = it },
-              label = { Text("Invite code") },
+              label = { Text(stringResource(R.string.label_invite_code)) },
               singleLine = true,
               colors = textFieldColors(),
             )
             TextField(
               value = registerPassword,
               onValueChange = { registerPassword = it },
-              label = { Text("Password") },
+              label = { Text(stringResource(R.string.label_password)) },
               singleLine = true,
               visualTransformation = PasswordVisualTransformation(),
               colors = textFieldColors(),
@@ -338,7 +359,7 @@ private fun AccountScreen(
               enabled =
                 registerUserId.isNotBlank() && inviteCode.isNotBlank() && registerPassword.isNotBlank(),
             ) {
-              Text("Register")
+              Text(stringResource(R.string.action_register))
             }
           }
         }
@@ -349,21 +370,21 @@ private fun AccountScreen(
   if (showAddServer) {
     AlertDialog(
       onDismissRequest = { showAddServer = false },
-      title = { Text("Add server") },
+      title = { Text(stringResource(R.string.title_add_server)) },
       text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
           TextField(
             value = newServerName,
             onValueChange = { newServerName = it },
-            label = { Text("Server name") },
+            label = { Text(stringResource(R.string.label_server_name)) },
             singleLine = true,
             colors = textFieldColors(),
           )
           TextField(
             value = newServerUrl,
             onValueChange = { newServerUrl = it },
-            label = { Text("Server URL") },
-            placeholder = { Text("http://host:8788") },
+            label = { Text(stringResource(R.string.label_server_url)) },
+            placeholder = { Text(stringResource(R.string.placeholder_server_url)) },
             singleLine = true,
             colors = textFieldColors(),
           )
@@ -372,7 +393,7 @@ private fun AccountScreen(
       confirmButton = {
         TextButton(
           onClick = {
-            val label = newServerName.trim().ifBlank { "custom-server" }
+            val label = newServerName.trim().ifBlank { defaultServerLabel }
             val url = normalizeServerUrl(newServerUrl)
             serverOptions.add(ServerOption(label = label, url = url))
             selectedServer = url
@@ -382,11 +403,13 @@ private fun AccountScreen(
           },
           enabled = newServerUrl.isNotBlank(),
         ) {
-          Text("Add")
+          Text(stringResource(R.string.action_add))
         }
       },
       dismissButton = {
-        TextButton(onClick = { showAddServer = false }) { Text("Cancel") }
+        TextButton(onClick = { showAddServer = false }) {
+          Text(stringResource(R.string.action_cancel))
+        }
       },
     )
   }
@@ -403,7 +426,8 @@ private fun ChatListScreen(
   onTogglePinThread: (String) -> Unit,
   onToggleArchiveThread: (String) -> Unit,
   onDeleteThread: (String) -> Unit,
-  onLogout: () -> Unit,
+  onRestoreThread: (String) -> Unit,
+  onPurgeThread: (String) -> Unit,
 ) {
   var showNewChat by remember { mutableStateOf(false) }
   var newChatTitle by rememberSaveable { mutableStateOf("") }
@@ -417,6 +441,8 @@ private fun ChatListScreen(
   var renameValue by rememberSaveable { mutableStateOf("") }
   var deleteTarget by remember { mutableStateOf<TestChatThread?>(null) }
   var showArchived by rememberSaveable { mutableStateOf(false) }
+  var purgeTarget by remember { mutableStateOf<TestChatThread?>(null) }
+  var showDeleted by rememberSaveable { mutableStateOf(false) }
 
   LaunchedEffect(renameTarget?.chatId) {
     renameValue = renameTarget?.let { resolveSessionLabel(it) }.orEmpty()
@@ -428,7 +454,7 @@ private fun ChatListScreen(
         title = {
           Column {
             Text(
-              text = "Vimagram",
+              text = stringResource(R.string.app_name),
               style = MaterialTheme.typography.titleLarge,
             )
             ConnectionStatusRow(state)
@@ -436,10 +462,10 @@ private fun ChatListScreen(
         },
         actions = {
           IconButton(onClick = { showAddHost = true }) {
-            Icon(imageVector = Icons.Default.Add, contentDescription = "Add host")
-          }
-          IconButton(onClick = onLogout) {
-            Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout")
+            Icon(
+              imageVector = Icons.Default.Add,
+              contentDescription = stringResource(R.string.action_add_host),
+            )
           }
         },
         colors =
@@ -451,7 +477,10 @@ private fun ChatListScreen(
     floatingActionButton = {
       if (state.hosts.isNotEmpty()) {
         FloatingActionButton(onClick = { showNewChat = true }) {
-          Icon(imageVector = Icons.Default.Add, contentDescription = "New chat")
+          Icon(
+            imageVector = Icons.Default.Add,
+            contentDescription = stringResource(R.string.action_new_chat),
+          )
         }
       }
     },
@@ -473,7 +502,7 @@ private fun ChatListScreen(
         ErrorCard(text = state.errorText ?: "")
       }
       if (state.hosts.isEmpty()) {
-        InfoCard(text = "No hosts yet. Generate a host token to connect Clawdbot.")
+        InfoCard(text = stringResource(R.string.info_no_hosts))
       } else {
           HostListRow(hosts = state.hosts, sessionUsage = state.sessionUsage)
       }
@@ -481,7 +510,7 @@ private fun ChatListScreen(
         TextField(
           value = searchQuery,
           onValueChange = { searchQuery = it },
-          label = { Text("Search sessions") },
+          label = { Text(stringResource(R.string.label_search_sessions)) },
           singleLine = true,
           colors = textFieldColors(),
           modifier = Modifier.fillMaxWidth(),
@@ -500,8 +529,11 @@ private fun ChatListScreen(
             title.contains(query) || machine.contains(query) || session.contains(query)
           }
         }
-      val activeThreads = filteredThreads.filterNot { it.isArchived }
-      val archivedThreads = filteredThreads.filter { it.isArchived }
+      val deletedThreads = filteredThreads.filter { it.isDeleted }
+      val activeThreads =
+        filteredThreads.filterNot { it.isArchived || it.isDeleted }
+      val archivedThreads =
+        filteredThreads.filter { it.isArchived && !it.isDeleted }
       val sortedActiveThreads =
         activeThreads.sortedWith(
           compareByDescending<TestChatThread> { it.isPinned }
@@ -512,6 +544,8 @@ private fun ChatListScreen(
           compareByDescending<TestChatThread> { it.isPinned }
             .thenByDescending { it.lastTimestampMs },
         )
+      val sortedDeletedThreads =
+        deletedThreads.sortedByDescending { it.deletedAt ?: it.lastTimestampMs }
       LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
@@ -536,9 +570,15 @@ private fun ChatListScreen(
                 Text(
                   text =
                     if (showArchived) {
-                      "Hide archived (${sortedArchivedThreads.size})"
+                      stringResource(
+                        R.string.action_hide_archived,
+                        sortedArchivedThreads.size,
+                      )
                     } else {
-                      "Show archived (${sortedArchivedThreads.size})"
+                      stringResource(
+                        R.string.action_show_archived,
+                        sortedArchivedThreads.size,
+                      )
                     },
                 )
               }
@@ -557,6 +597,40 @@ private fun ChatListScreen(
             }
           }
         }
+        if (sortedDeletedThreads.isNotEmpty()) {
+          item {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.Center,
+            ) {
+              TextButton(onClick = { showDeleted = !showDeleted }) {
+                Text(
+                  text =
+                    if (showDeleted) {
+                      stringResource(
+                        R.string.action_hide_deleted,
+                        sortedDeletedThreads.size,
+                      )
+                    } else {
+                      stringResource(
+                        R.string.action_show_deleted,
+                        sortedDeletedThreads.size,
+                      )
+                    },
+                )
+              }
+            }
+          }
+          if (showDeleted) {
+            items(sortedDeletedThreads) { thread ->
+              DeletedThreadRow(
+                thread = thread,
+                onRestore = { onRestoreThread(thread.chatId) },
+                onDeleteForever = { purgeTarget = thread },
+              )
+            }
+          }
+        }
       }
     }
   }
@@ -565,12 +639,12 @@ private fun ChatListScreen(
     val target = renameTarget
     AlertDialog(
       onDismissRequest = { renameTarget = null },
-      title = { Text("Rename session") },
+      title = { Text(stringResource(R.string.title_rename_session)) },
       text = {
         TextField(
           value = renameValue,
           onValueChange = { renameValue = it },
-          label = { Text("Session name") },
+          label = { Text(stringResource(R.string.label_session_name)) },
           singleLine = true,
           colors = textFieldColors(),
         )
@@ -585,11 +659,13 @@ private fun ChatListScreen(
           },
           enabled = renameValue.isNotBlank(),
         ) {
-          Text("Save")
+          Text(stringResource(R.string.action_save))
         }
       },
       dismissButton = {
-        TextButton(onClick = { renameTarget = null }) { Text("Cancel") }
+        TextButton(onClick = { renameTarget = null }) {
+          Text(stringResource(R.string.action_cancel))
+        }
       },
     )
   }
@@ -598,8 +674,8 @@ private fun ChatListScreen(
     val target = deleteTarget
     AlertDialog(
       onDismissRequest = { deleteTarget = null },
-      title = { Text("Delete session?") },
-      text = { Text("This removes the session and its local messages.") },
+      title = { Text(stringResource(R.string.title_delete_session)) },
+      text = { Text(stringResource(R.string.msg_delete_session)) },
       confirmButton = {
         TextButton(
           onClick = {
@@ -609,11 +685,39 @@ private fun ChatListScreen(
             deleteTarget = null
           },
         ) {
-          Text("Delete")
+          Text(stringResource(R.string.action_delete))
         }
       },
       dismissButton = {
-        TextButton(onClick = { deleteTarget = null }) { Text("Cancel") }
+        TextButton(onClick = { deleteTarget = null }) {
+          Text(stringResource(R.string.action_cancel))
+        }
+      },
+    )
+  }
+
+  if (purgeTarget != null) {
+    val target = purgeTarget
+    AlertDialog(
+      onDismissRequest = { purgeTarget = null },
+      title = { Text(stringResource(R.string.title_delete_forever)) },
+      text = { Text(stringResource(R.string.msg_delete_forever)) },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            if (target != null) {
+              onPurgeThread(target.chatId)
+            }
+            purgeTarget = null
+          },
+        ) {
+          Text(stringResource(R.string.action_delete))
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { purgeTarget = null }) {
+          Text(stringResource(R.string.action_cancel))
+        }
       },
     )
   }
@@ -628,20 +732,20 @@ private fun ChatListScreen(
     }
     AlertDialog(
       onDismissRequest = { showNewChat = false },
-      title = { Text("New chat") },
+      title = { Text(stringResource(R.string.title_new_chat)) },
       text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
           TextField(
             value = newChatTitle,
             onValueChange = { newChatTitle = it },
-            label = { Text("Title") },
+            label = { Text(stringResource(R.string.label_title)) },
             singleLine = true,
             colors = textFieldColors(),
           )
           TextField(
             value = newChatSession,
             onValueChange = { newChatSession = it },
-            label = { Text("Session name (optional)") },
+            label = { Text(stringResource(R.string.label_session_name_optional)) },
             singleLine = true,
             colors = textFieldColors(),
           )
@@ -665,11 +769,13 @@ private fun ChatListScreen(
           },
           enabled = newChatHost.isNotBlank(),
         ) {
-          Text("Create")
+          Text(stringResource(R.string.action_create))
         }
       },
       dismissButton = {
-        TextButton(onClick = { showNewChat = false }) { Text("Cancel") }
+        TextButton(onClick = { showNewChat = false }) {
+          Text(stringResource(R.string.action_cancel))
+        }
       },
     )
   }
@@ -677,13 +783,13 @@ private fun ChatListScreen(
   if (showAddHost) {
     AlertDialog(
       onDismissRequest = { showAddHost = false },
-      title = { Text("Add host") },
+      title = { Text(stringResource(R.string.title_add_host)) },
       text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
           TextField(
             value = newHostLabel,
             onValueChange = { newHostLabel = it },
-            label = { Text("Host name") },
+            label = { Text(stringResource(R.string.label_host_name)) },
             singleLine = true,
             colors = textFieldColors(),
           )
@@ -700,11 +806,13 @@ private fun ChatListScreen(
           },
           enabled = newHostLabel.isNotBlank(),
         ) {
-          Text("Generate token")
+          Text(stringResource(R.string.action_generate_token))
         }
       },
       dismissButton = {
-        TextButton(onClick = { showAddHost = false }) { Text("Cancel") }
+        TextButton(onClick = { showAddHost = false }) {
+          Text(stringResource(R.string.action_cancel))
+        }
       },
     )
   }
@@ -714,10 +822,15 @@ private fun ChatListScreen(
     val clipboard = LocalClipboardManager.current
     AlertDialog(
       onDismissRequest = { generatedHost = null },
-      title = { Text("Host token") },
+      title = { Text(stringResource(R.string.title_host_token)) },
       text = {
         Text(
-          text = "Host: ${info?.first}\nToken: ${info?.second}\nUse this token in Clawdbot.",
+          text =
+            stringResource(
+              R.string.msg_host_token,
+              info?.first.orEmpty(),
+              info?.second.orEmpty(),
+            ),
         )
       },
       confirmButton = {
@@ -729,11 +842,13 @@ private fun ChatListScreen(
             }
           },
         ) {
-          Text("Copy token")
+          Text(stringResource(R.string.action_copy_token))
         }
       },
       dismissButton = {
-        TextButton(onClick = { generatedHost = null }) { Text("OK") }
+        TextButton(onClick = { generatedHost = null }) {
+          Text(stringResource(R.string.action_ok))
+        }
       },
     )
   }
@@ -745,7 +860,6 @@ private fun ChatScreen(
   state: TestChatUiState,
   onBack: () -> Unit,
   onSend: (String) -> Unit,
-  onLogout: () -> Unit,
 ) {
   val chatId = state.activeChatId ?: return
   val thread = state.threads.firstOrNull { it.chatId == chatId }
@@ -787,12 +901,10 @@ private fun ChatScreen(
         },
         navigationIcon = {
           IconButton(onClick = onBack) {
-            Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
-          }
-        },
-        actions = {
-          IconButton(onClick = onLogout) {
-            Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout")
+            Icon(
+              imageVector = Icons.Default.ArrowBack,
+              contentDescription = stringResource(R.string.action_back),
+            )
           }
         },
         colors =
@@ -845,22 +957,22 @@ private fun ChatScreen(
 private fun AccountDashboardScreen(
   state: TestChatUiState,
   onLogout: () -> Unit,
+  languageTag: String,
+  onLanguageChange: (String) -> Unit,
 ) {
   val account = state.account
-  val userLabel = account?.userId ?: "unknown"
-  val serverLabel = account?.serverUrl?.let { formatServerLabel(it) } ?: "unknown"
-  val sessionUsage = state.sessionUsage
-  val totalTokens = sessionUsage.sumOf { it.tokenCount }
+  val userLabel = account?.userId ?: stringResource(R.string.label_unknown_user)
+  val serverLabel =
+    account?.serverUrl?.let { formatServerLabel(it, stringResource(R.string.label_unknown_server)) }
+      ?: stringResource(R.string.label_unknown_server)
+  val hosts = state.hosts
+  val clipboard = LocalClipboardManager.current
+  var showLogoutConfirm by remember { mutableStateOf(false) }
 
   Scaffold(
     topBar = {
       TopAppBar(
-        title = { Text("Account") },
-        actions = {
-          IconButton(onClick = onLogout) {
-            Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout")
-          }
-        },
+        title = { Text(stringResource(R.string.title_account)) },
         colors =
           TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -883,32 +995,69 @@ private fun AccountDashboardScreen(
         }
       }
       item {
-        SectionHeader(text = "Account")
+        SectionHeader(text = stringResource(R.string.title_account_section))
         AccountSummaryCard(
           userId = userLabel,
           serverLabel = serverLabel,
         )
       }
       item {
-        SectionHeader(text = "Usage totals")
-        UsageTotalsCard(
-          totalTokens = totalTokens,
-          sessionCount = sessionUsage.size,
+        SectionHeader(text = stringResource(R.string.title_host_tokens))
+        if (hosts.isEmpty()) {
+          InfoCard(text = stringResource(R.string.info_no_hosts_connected))
+        } else {
+          Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            hosts.forEach { host ->
+              HostTokenCard(
+                host = host,
+                onCopy = {
+                  clipboard.setText(AnnotatedString(host.token))
+                },
+              )
+            }
+          }
+        }
+      }
+      item {
+        SectionHeader(text = stringResource(R.string.title_language))
+        LanguagePicker(
+          selectedTag = languageTag,
+          onSelected = onLanguageChange,
         )
       }
       item {
-        SectionHeader(text = "Sessions")
-      }
-      if (sessionUsage.isEmpty()) {
-        item {
-          InfoCard(text = "No session activity yet.")
-        }
-      } else {
-        items(sessionUsage) { usage ->
-          SessionUsageCard(usage = usage)
+        Spacer(modifier = Modifier.height(4.dp))
+        Button(
+          onClick = { showLogoutConfirm = true },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(stringResource(R.string.action_logout))
         }
       }
     }
+  }
+
+  if (showLogoutConfirm) {
+    AlertDialog(
+      onDismissRequest = { showLogoutConfirm = false },
+      title = { Text(stringResource(R.string.title_logout_confirm)) },
+      text = { Text(stringResource(R.string.msg_logout_confirm)) },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            showLogoutConfirm = false
+            onLogout()
+          },
+        ) {
+          Text(stringResource(R.string.action_logout))
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showLogoutConfirm = false }) {
+          Text(stringResource(R.string.action_cancel))
+        }
+      },
+    )
   }
 }
 
@@ -921,14 +1070,24 @@ private fun AppBottomNav(
     NavigationBarItem(
       selected = currentTab == MainTab.Chat,
       onClick = { onTabSelected(MainTab.Chat) },
-      icon = { Icon(imageVector = Icons.Default.ChatBubble, contentDescription = "Chat") },
-      label = { Text("Chat") },
+      icon = {
+        Icon(
+          imageVector = Icons.Default.ChatBubble,
+          contentDescription = stringResource(R.string.tab_chat),
+        )
+      },
+      label = { Text(stringResource(R.string.tab_chat)) },
     )
     NavigationBarItem(
       selected = currentTab == MainTab.Account,
       onClick = { onTabSelected(MainTab.Account) },
-      icon = { Icon(imageVector = Icons.Default.Person, contentDescription = "Account") },
-      label = { Text("Account") },
+      icon = {
+        Icon(
+          imageVector = Icons.Default.Person,
+          contentDescription = stringResource(R.string.tab_account),
+        )
+      },
+      label = { Text(stringResource(R.string.tab_account)) },
     )
   }
 }
@@ -956,13 +1115,39 @@ private fun AccountSummaryCard(
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       Text(
-        text = "User: $userId",
+        text = stringResource(R.string.label_user_value, userId),
         style = MaterialTheme.typography.bodyMedium,
       )
       Text(
-        text = "Server: $serverLabel",
+        text = stringResource(R.string.label_server_value, serverLabel),
         style = MaterialTheme.typography.bodyMedium,
       )
+    }
+  }
+}
+
+@Composable
+private fun HostTokenCard(
+  host: TestChatHost,
+  onCopy: () -> Unit,
+) {
+  val color = resolveMachineColor(host.label)
+  Card(
+    shape = RoundedCornerShape(18.dp),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+  ) {
+    Column(
+      modifier = Modifier.padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      MachineBadge(label = host.label, color = color)
+      Text(
+        text = stringResource(R.string.label_token_value, host.token),
+        style = MaterialTheme.typography.bodySmall,
+      )
+      OutlinedButton(onClick = onCopy) {
+        Text(stringResource(R.string.action_copy_token))
+      }
     }
   }
 }
@@ -981,11 +1166,11 @@ private fun UsageTotalsCard(
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       Text(
-        text = "Total tokens: $totalTokens",
+        text = stringResource(R.string.label_total_tokens, totalTokens),
         style = MaterialTheme.typography.bodyMedium,
       )
       Text(
-        text = "Sessions: $sessionCount",
+        text = stringResource(R.string.label_sessions_count, sessionCount),
         style = MaterialTheme.typography.bodyMedium,
       )
     }
@@ -995,7 +1180,12 @@ private fun UsageTotalsCard(
 @Composable
 private fun SessionUsageCard(usage: TestChatSessionUsage) {
   val hostColor = resolveMachineColor(usage.hostLabel)
-  val lastTime = if (usage.lastTimestampMs > 0) formatTime(usage.lastTimestampMs) else "none"
+  val lastTime =
+    if (usage.lastTimestampMs > 0) {
+      formatTime(usage.lastTimestampMs)
+    } else {
+      stringResource(R.string.label_none)
+    }
   Card(
     shape = RoundedCornerShape(18.dp),
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -1021,7 +1211,7 @@ private fun SessionUsageCard(usage: TestChatSessionUsage) {
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         MachineBadge(label = usage.hostLabel, color = hostColor)
         Text(
-          text = "tokens ${usage.tokenCount}",
+          text = stringResource(R.string.label_tokens_short, usage.tokenCount),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1034,24 +1224,41 @@ private fun SessionUsageCard(usage: TestChatSessionUsage) {
 private fun ConnectionStatusRow(state: TestChatUiState) {
   val (label, color) =
     when (state.connectionState) {
-      TestChatConnectionState.Connected -> "Connected" to Color(0xFF16A34A)
-      TestChatConnectionState.Connecting -> "Connecting" to Color(0xFFF59E0B)
-      TestChatConnectionState.Error -> "Error" to Color(0xFFDC2626)
-      TestChatConnectionState.Disconnected -> "Disconnected" to Color(0xFF64748B)
+      TestChatConnectionState.Connected ->
+        stringResource(R.string.status_connected) to Color(0xFF16A34A)
+      TestChatConnectionState.Connecting ->
+        stringResource(R.string.status_connecting) to Color(0xFFF59E0B)
+      TestChatConnectionState.Error ->
+        stringResource(R.string.status_error) to Color(0xFFDC2626)
+      TestChatConnectionState.Disconnected ->
+        stringResource(R.string.status_disconnected) to Color(0xFF64748B)
     }
   val account = state.account
   val serverLabel =
-    account?.serverUrl?.let { formatServerLabel(it) } ?: "server not set"
-  val userLabel = account?.userId ?: "unknown user"
+    account?.serverUrl?.let { formatServerLabel(it, stringResource(R.string.label_unknown_server)) }
+      ?: stringResource(R.string.label_server_not_set)
+  val userLabel = account?.userId ?: stringResource(R.string.label_unknown_user)
   val lastActivityMs = state.threads.maxOfOrNull { it.lastTimestampMs }
-  val lastActivityLabel = lastActivityMs?.let { formatTime(it) } ?: "none"
+  val lastActivityLabel =
+    lastActivityMs?.let { formatTime(it) } ?: stringResource(R.string.label_none)
   val hostCount = state.hosts.size
-  val hostLabel = if (hostCount == 0) "no hosts" else "$hostCount hosts"
+  val hostLabel =
+    if (hostCount == 0) {
+      stringResource(R.string.label_no_hosts)
+    } else {
+      stringResource(R.string.label_hosts_count, hostCount)
+    }
   val detail =
     if (!state.errorText.isNullOrBlank()) {
       state.errorText
     } else {
-      "$userLabel@$serverLabel · $hostLabel · last $lastActivityLabel"
+      stringResource(
+        R.string.label_connection_detail,
+        userLabel,
+        serverLabel,
+        hostLabel,
+        lastActivityLabel,
+      )
     }
   Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1133,12 +1340,12 @@ private fun ServerPicker(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Text(
-        text = "Server",
+        text = stringResource(R.string.label_server),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       TextButton(onClick = onAddServer) {
-        Text("Add server")
+        Text(stringResource(R.string.action_add_server))
       }
     }
     Row(
@@ -1191,7 +1398,7 @@ private fun HostUsageCard(host: TestChatHost, tokenCount: Int) {
     ) {
       MachineBadge(label = host.label, color = color)
       Text(
-        text = "tokens $tokenCount",
+        text = stringResource(R.string.label_tokens_short, tokenCount),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -1208,7 +1415,7 @@ private fun HostPicker(
 ) {
   if (hosts.isEmpty()) {
     Text(
-      text = "No hosts available",
+      text = stringResource(R.string.info_no_hosts_available),
       style = MaterialTheme.typography.labelSmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -1216,7 +1423,7 @@ private fun HostPicker(
   }
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
-      text = "Host",
+      text = stringResource(R.string.label_host),
       style = MaterialTheme.typography.labelMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -1234,6 +1441,105 @@ private fun HostPicker(
           OutlinedButton(onClick = { onSelected(host) }) {
             Text(host)
           }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun LanguagePicker(
+  selectedTag: String,
+  onSelected: (String) -> Unit,
+) {
+  val options =
+    listOf(
+      Pair("system", stringResource(R.string.language_system)),
+      Pair("zh", stringResource(R.string.language_zh)),
+      Pair("en", stringResource(R.string.language_en)),
+    )
+  Row(
+    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    options.forEach { (tag, label) ->
+      val isSelected = selectedTag == tag
+      if (isSelected) {
+        Button(onClick = { onSelected(tag) }) {
+          Text(label)
+        }
+      } else {
+        OutlinedButton(onClick = { onSelected(tag) }) {
+          Text(label)
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun DeletedThreadRow(
+  thread: TestChatThread,
+  onRestore: () -> Unit,
+  onDeleteForever: () -> Unit,
+) {
+  val identity = parseChatIdentity(thread.chatId)
+  val sessionLabel = resolveSessionLabel(thread)
+  val machineLabel = identity.machine
+  val machineColor = resolveMachineColor(machineLabel)
+  val deletedAt = thread.deletedAt ?: thread.lastTimestampMs
+  Card(
+    shape = RoundedCornerShape(18.dp),
+    colors =
+      CardDefaults.cardColors(
+        containerColor = MaterialTheme.colorScheme.surface,
+      ),
+  ) {
+    Column(
+      modifier = Modifier.fillMaxWidth().padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+      ) {
+        ChatAvatar(label = sessionLabel, color = machineColor)
+        Column(modifier = Modifier.weight(1f)) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              text = sessionLabel,
+              style = MaterialTheme.typography.titleMedium,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1f),
+            )
+            Text(
+              text = formatTime(deletedAt),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Spacer(modifier = Modifier.height(4.dp))
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            MachineBadge(label = machineLabel, color = machineColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+              text = thread.lastMessage,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = onRestore) {
+          Text(stringResource(R.string.action_restore))
+        }
+        OutlinedButton(onClick = onDeleteForever) {
+          Text(stringResource(R.string.action_delete_forever))
         }
       }
     }
@@ -1280,7 +1586,7 @@ private fun ChatThreadRow(
           if (thread.isPinned) {
             Icon(
               imageVector = Icons.Default.PushPin,
-              contentDescription = "Pinned",
+              contentDescription = stringResource(R.string.label_pinned),
               tint = MaterialTheme.colorScheme.primary,
               modifier = Modifier.size(16.dp),
             )
@@ -1311,14 +1617,17 @@ private fun ChatThreadRow(
       }
       Box {
         IconButton(onClick = { menuExpanded = true }) {
-          Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
+          Icon(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = stringResource(R.string.action_more),
+          )
         }
         DropdownMenu(
           expanded = menuExpanded,
           onDismissRequest = { menuExpanded = false },
         ) {
           DropdownMenuItem(
-            text = { Text("Rename") },
+            text = { Text(stringResource(R.string.action_rename)) },
             onClick = {
               menuExpanded = false
               onRename()
@@ -1326,7 +1635,15 @@ private fun ChatThreadRow(
             leadingIcon = { Icon(imageVector = Icons.Default.Edit, contentDescription = null) },
           )
           DropdownMenuItem(
-            text = { Text(if (thread.isPinned) "Unpin" else "Pin") },
+            text = {
+              Text(
+                if (thread.isPinned) {
+                  stringResource(R.string.action_unpin)
+                } else {
+                  stringResource(R.string.action_pin)
+                },
+              )
+            },
             onClick = {
               menuExpanded = false
               onTogglePinned()
@@ -1334,7 +1651,15 @@ private fun ChatThreadRow(
             leadingIcon = { Icon(imageVector = Icons.Default.PushPin, contentDescription = null) },
           )
           DropdownMenuItem(
-            text = { Text(if (thread.isArchived) "Unarchive" else "Archive") },
+            text = {
+              Text(
+                if (thread.isArchived) {
+                  stringResource(R.string.action_unarchive)
+                } else {
+                  stringResource(R.string.action_archive)
+                },
+              )
+            },
             onClick = {
               menuExpanded = false
               onToggleArchived()
@@ -1348,7 +1673,7 @@ private fun ChatThreadRow(
             },
           )
           DropdownMenuItem(
-            text = { Text("Delete") },
+            text = { Text(stringResource(R.string.action_delete)) },
             onClick = {
               menuExpanded = false
               onDelete()
@@ -1361,9 +1686,9 @@ private fun ChatThreadRow(
   }
 }
 
-private fun formatServerLabel(raw: String): String {
+private fun formatServerLabel(raw: String, fallback: String): String {
   val trimmed = raw.trim()
-  if (trimmed.isBlank()) return "unknown server"
+  if (trimmed.isBlank()) return fallback
   return runCatching {
     val uri = URI(trimmed)
     val host = uri.host ?: trimmed.removePrefix("http://").removePrefix("https://")
@@ -1382,12 +1707,13 @@ private fun normalizeServerUrl(raw: String): String {
   }
 }
 
+@Composable
 private fun formatDeliveryStatus(raw: String?): String? {
   return when (raw) {
-    "sending" -> "Sending"
-    "sent" -> "Accepted"
-    "ack" -> "Replied"
-    "failed" -> "Failed"
+    "sending" -> stringResource(R.string.status_sending)
+    "sent" -> stringResource(R.string.status_accepted)
+    "ack" -> stringResource(R.string.status_replied)
+    "failed" -> stringResource(R.string.status_failed)
     else -> null
   }
 }
@@ -1419,7 +1745,7 @@ private fun ChatAvatar(label: String, color: Color) {
 
 @Composable
 private fun MachineBadge(label: String, color: Color) {
-  val text = if (label.isBlank()) "default" else label
+  val text = if (label.isBlank()) stringResource(R.string.label_default_machine) else label
   Box(
     modifier =
       Modifier
@@ -1582,7 +1908,7 @@ private fun Composer(
       value = value,
       onValueChange = onValueChange,
       modifier = Modifier.weight(1f),
-      placeholder = { Text("Message") },
+      placeholder = { Text(stringResource(R.string.label_message)) },
       maxLines = 4,
       colors =
         TextFieldDefaults.colors(
@@ -1602,7 +1928,10 @@ private fun Composer(
       onClick = onSend,
       enabled = value.isNotBlank(),
     ) {
-      Icon(imageVector = Icons.Default.Send, contentDescription = "Send")
+      Icon(
+        imageVector = Icons.Default.Send,
+        contentDescription = stringResource(R.string.action_send),
+      )
     }
   }
 }

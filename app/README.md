@@ -1,51 +1,45 @@
-## Clawdbot Node (Android) (internal)
+## Vimagram (Android)
 
-Modern Android node app: connects to the **Gateway WebSocket** (`_clawdbot-gw._tcp`) and exposes **Canvas + Chat + Camera**.
+English | [中文](README.zh.md)
 
-Notes:
-- The node keeps the connection alive via a **foreground service** (persistent notification with a Disconnect action).
-- Chat always uses the shared session key **`main`** (same session across iOS/macOS/WebChat/Android).
-- Supports modern Android only (`minSdk 31`, Kotlin + Jetpack Compose).
+Android client for the Vimalinx Server channel. Use it to register/login,
+generate host tokens, and chat.
+
+Highlights:
+- Connects directly to Vimalinx Server (not the Gateway).
+- Host tokens live in **Account** for easy recovery.
+- Language toggle (System/Chinese/English).
 
 ## Open in Android Studio
-- Open the folder `apps/android`.
+- Open the folder `app`.
 
 ## Build / Run
 
 ```bash
-cd apps/android
+cd app
 ./gradlew :app:assembleDebug
 ./gradlew :app:installDebug
 ./gradlew :app:testDebugUnitTest
 ```
 
-`gradlew` auto-detects the Android SDK at `~/Library/Android/sdk` (macOS default) if `ANDROID_SDK_ROOT` / `ANDROID_HOME` are unset.
+For a release build:
 
-## Connect / Pair
-
-1) Start the gateway (on your “master” machine):
 ```bash
-pnpm clawdbot gateway --port 18789 --verbose
+./gradlew :app:assembleRelease
 ```
 
-2) In the Android app:
-- Open **Settings**
-- Either select a discovered gateway under **Discovered Gateways**, or use **Advanced → Manual Gateway** (host + port).
+`gradlew` auto-detects the Android SDK at `~/Library/Android/sdk` (macOS default) if
+`ANDROID_SDK_ROOT` / `ANDROID_HOME` are unset.
 
-3) Approve pairing (on the gateway machine):
-```bash
-clawdbot nodes pending
-clawdbot nodes approve <requestId>
-```
+## Connect to Vimalinx Server
 
-More details: `docs/platforms/android.md`.
+1) Start the server (see `server/README.md`).
+2) In Vimagram, register or log in with the server URL and your user ID.
+3) Generate a host token from **Account** and copy it.
+4) In Clawdbot, install/configure the Vimalinx Server plugin
+   (see `plugin/README.md`) and paste the token.
 
-## Permissions
+## Notes
 
-- Discovery:
-  - Android 13+ (`API 33+`): `NEARBY_WIFI_DEVICES`
-  - Android 12 and below: `ACCESS_FINE_LOCATION` (required for NSD scanning)
-- Foreground service notification (Android 13+): `POST_NOTIFICATIONS`
-- Camera:
-  - `CAMERA` for `camera.snap` and `camera.clip`
-  - `RECORD_AUDIO` for `camera.clip` when `includeAudio=true`
+- Debug builds can be installed directly with `:app:installDebug`.
+- If the device prompts for install permissions, approve it to finish the install.

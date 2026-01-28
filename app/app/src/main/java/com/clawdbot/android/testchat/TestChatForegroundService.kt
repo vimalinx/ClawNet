@@ -44,10 +44,10 @@ class TestChatForegroundService : Service() {
     val channel =
       NotificationChannel(
         CHANNEL_ID,
-        "Vimagram",
+        getString(R.string.notification_channel_status),
         NotificationManager.IMPORTANCE_LOW,
       ).apply {
-        description = "Keeps Vimagram active in the background"
+        description = getString(R.string.notification_channel_status_desc)
         setShowBadge(false)
       }
     val mgr = getSystemService(NotificationManager::class.java)
@@ -76,18 +76,24 @@ class TestChatForegroundService : Service() {
       )
 
     val hostLabel =
-      if (currentHostCount > 0) "$currentHostCount hosts" else "no hosts"
-    val userLabel = currentUserId?.let { "user $it" } ?: "no user"
+      if (currentHostCount > 0) {
+        getString(R.string.status_hosts_count, currentHostCount)
+      } else {
+        getString(R.string.status_no_hosts)
+      }
+    val userLabel =
+      currentUserId?.let { getString(R.string.status_user, it) }
+        ?: getString(R.string.status_no_user)
     val text = "$userLabel · $hostLabel"
 
     return NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(R.mipmap.ic_launcher)
-      .setContentTitle("Vimagram running")
+      .setContentTitle(getString(R.string.notification_running_title))
       .setContentText(text)
       .setContentIntent(launchPending)
       .setOngoing(true)
       .setOnlyAlertOnce(true)
-      .addAction(0, "Stop", stopPending)
+      .addAction(0, getString(R.string.action_stop), stopPending)
       .build()
   }
 

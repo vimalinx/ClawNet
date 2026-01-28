@@ -71,10 +71,10 @@ class TestChatNotifier(private val app: Application) {
     val channel =
       NotificationChannel(
         CHANNEL_ID,
-        "Vimagram messages",
+        app.getString(R.string.notification_channel_messages),
         NotificationManager.IMPORTANCE_HIGH,
       ).apply {
-        description = "Messages from Vimagram"
+        description = app.getString(R.string.notification_channel_messages_desc)
         setSound(soundUri, audioAttrs)
       }
     val systemManager = app.getSystemService(NotificationManager::class.java)

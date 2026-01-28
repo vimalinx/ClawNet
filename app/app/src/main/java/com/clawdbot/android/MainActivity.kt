@@ -17,6 +17,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    AppLocale.apply(this, viewModel.languageTag.value)
     setContent {
       TestChatApp(viewModel = viewModel)
     }

@@ -60,6 +60,8 @@ async function loginTestUser(params: {
 }
 
 const DEFAULT_TEST_SERVER_URL = "http://123.60.21.129:8788";
+const OFFICIAL_SERVER_LABEL = "Vimalinx official";
+const CUSTOM_SERVER_LABEL = "Custom server";
 
 function setTestAccountConfig(
   cfg: ClawdbotConfig,
@@ -161,11 +163,19 @@ export const testOnboardingAdapter: ChannelOnboardingAdapter = {
     const configured = listTestAccountIds(cfg as TestConfig).some((accountId) =>
       Boolean(resolveTestAccount({ cfg: cfg as TestConfig, accountId }).baseUrl),
     );
+    const defaultAccountId = resolveDefaultTestAccountId(cfg as TestConfig);
+    const resolved = resolveTestAccount({ cfg: cfg as TestConfig, accountId: defaultAccountId });
+    const baseUrl =
+      normalizeServerUrl(resolved.baseUrl ?? DEFAULT_TEST_SERVER_URL) ?? DEFAULT_TEST_SERVER_URL;
+    const serverLabel = baseUrl === DEFAULT_TEST_SERVER_URL ? "official" : "custom";
     return {
       channel,
       configured,
-      statusLines: [`Vimalinx Server: ${configured ? "configured" : "needs server URL"}`],
-      selectionHint: configured ? "configured · local server" : "local server",
+      statusLines: [
+        `Vimalinx Server: ${configured ? "configured" : "needs server URL"}`,
+        `Server: ${serverLabel}`,
+      ],
+      selectionHint: configured ? `configured · ${serverLabel}` : "local server",
       quickstartScore: configured ? 1 : 8,
     };
   },
@@ -192,8 +202,28 @@ export const testOnboardingAdapter: ChannelOnboardingAdapter = {
     accountId = accountId ?? defaultAccountId;
 
     const existing = resolveTestAccount({ cfg: cfg as TestConfig, accountId });
-    const serverUrl =
+    const normalizedExisting =
       normalizeServerUrl(existing.baseUrl ?? DEFAULT_TEST_SERVER_URL) ?? DEFAULT_TEST_SERVER_URL;
+    const isOfficial = normalizedExisting === DEFAULT_TEST_SERVER_URL;
+    const serverChoice = await prompter.select({
+      message: "Vimalinx server",
+      options: [
+        { value: "official", label: OFFICIAL_SERVER_LABEL },
+        { value: "custom", label: CUSTOM_SERVER_LABEL },
+      ],
+      initialValue: isOfficial ? "official" : "custom",
+    });
+    let serverUrl = DEFAULT_TEST_SERVER_URL;
+    if (serverChoice === "custom") {
+      const rawServer = await prompter.text({
+        message: "Server URL",
+        placeholder: DEFAULT_TEST_SERVER_URL,
+        initialValue: normalizedExisting,
+        validate: (value) =>
+          normalizeServerUrl(String(value ?? "")) ? undefined : "Must include http:// or https://",
+      });
+      serverUrl = normalizeServerUrl(String(rawServer)) ?? DEFAULT_TEST_SERVER_URL;
+    }
 
     const token = await prompter.text({
       message: "Vimalinx token",

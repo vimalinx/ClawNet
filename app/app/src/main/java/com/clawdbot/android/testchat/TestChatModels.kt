@@ -54,6 +54,8 @@ data class TestChatThread(
   val unreadCount: Int = 0,
   val isPinned: Boolean = false,
   val isArchived: Boolean = false,
+  val isDeleted: Boolean = false,
+  val deletedAt: Long? = null,
 )
 
 @Serializable

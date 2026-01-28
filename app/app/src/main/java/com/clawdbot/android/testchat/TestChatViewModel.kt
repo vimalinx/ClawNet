@@ -1,6 +1,8 @@
 package com.clawdbot.android.testchat
 
 import android.app.Application
+import androidx.annotation.StringRes
+import com.clawdbot.android.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.util.UUID
@@ -32,6 +34,9 @@ data class TestChatUiState(
 )
 
 class TestChatViewModel(app: Application) : AndroidViewModel(app) {
+  private fun appString(@StringRes id: Int, vararg args: Any): String {
+    return getApplication<Application>().getString(id, *args)
+  }
   private val json = Json { ignoreUnknownKeys = true }
   private val client =
     TestServerClient(
@@ -49,6 +54,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
   private val _account = MutableStateFlow(prefs.account.value)
   private val _password = MutableStateFlow(prefs.password.value)
   private val _hosts = MutableStateFlow(prefs.hosts.value)
+  private val _languageTag = MutableStateFlow(prefs.languageTag.value)
   private val _connectionState = MutableStateFlow(TestChatConnectionState.Disconnected)
   private val _errorText = MutableStateFlow<String?>(null)
   private val _snapshot = MutableStateFlow(TestChatSnapshot())
@@ -103,6 +109,8 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
       )
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, TestChatUiState())
 
+  val languageTag: StateFlow<String> = _languageTag
+
   init {
     val account = _account.value
     val password = _password.value
@@ -133,7 +141,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val normalizedInvite = inviteCode.trim()
     val normalizedPassword = password.trim()
     if (normalizedUser.isBlank() || normalizedInvite.isBlank() || normalizedPassword.length < 6) {
-      _errorText.value = "User ID, invite code, and password required"
+      _errorText.value = appString(R.string.error_register_required)
       return
     }
     _errorText.value = null
@@ -148,12 +156,13 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
           )
         }
           .getOrElse {
-            _errorText.value = "Registration failed: ${it.message}"
+            _errorText.value =
+              appString(R.string.error_register_failed_detail, it.message ?: "")
             return@launch
           }
       val userId = response.userId?.trim().orEmpty()
       if (response.ok != true || userId.isBlank()) {
-        _errorText.value = response.error ?: "Registration failed"
+        _errorText.value = response.error ?: appString(R.string.error_register_failed)
         return@launch
       }
       val account = TestChatAccount(serverUrl = normalizedServer, userId = userId)
@@ -176,7 +185,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val normalizedUser = userId.trim()
     val normalizedPassword = password.trim()
     if (normalizedUser.isBlank() || normalizedPassword.length < 6) {
-      _errorText.value = "User ID and password required"
+      _errorText.value = appString(R.string.error_login_required)
       return
     }
     _errorText.value = null
@@ -207,16 +216,16 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val account = _account.value ?: return
     val password = _password.value
     if (password.isNullOrBlank()) {
-      _errorText.value = "Password missing"
+      _errorText.value = appString(R.string.error_password_missing)
       return
     }
     val normalizedLabel = normalizeHostLabel(label)
     if (normalizedLabel.isBlank()) {
-      _errorText.value = "Host name required"
+      _errorText.value = appString(R.string.error_host_name_required)
       return
     }
     if (_hosts.value.any { it.label.equals(normalizedLabel, ignoreCase = true) }) {
-      _errorText.value = "Host name already exists"
+      _errorText.value = appString(R.string.error_host_name_exists)
       return
     }
     _errorText.value = null
@@ -224,12 +233,13 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
       val response =
         runCatching { client.requestToken(account.serverUrl, account.userId, password) }
           .getOrElse {
-            _errorText.value = "Token request failed: ${it.message}"
+            _errorText.value =
+              appString(R.string.error_token_request_failed_detail, it.message ?: "")
             return@launch
           }
       val token = response.token?.trim().orEmpty()
       if (response.ok != true || token.isBlank()) {
-        _errorText.value = response.error ?: "Token request failed"
+        _errorText.value = response.error ?: appString(R.string.error_token_request_failed)
         return@launch
       }
       val host = TestChatHost(label = normalizedLabel, token = token)
@@ -240,7 +250,11 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
           parseChatIdentity(it.chatId).machine.equals(host.label, ignoreCase = true)
         }
       ) {
-        createThread(title = "${host.label} session", hostLabel = host.label, sessionName = "main")
+        createThread(
+          title = appString(R.string.label_host_session, host.label),
+          hostLabel = host.label,
+          sessionName = "main",
+        )
       }
       startStreams(account, nextHosts)
       refreshTokenUsage(account, password)
@@ -262,16 +276,23 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     _errorText.value = null
   }
 
+  fun setLanguageTag(tag: String) {
+    val normalized = tag.trim().ifBlank { "system" }
+    if (_languageTag.value == normalized) return
+    prefs.saveLanguageTag(normalized)
+    _languageTag.value = normalized
+  }
+
   private suspend fun verifyAccountLogin(account: TestChatAccount, password: String): Boolean {
     val response =
       runCatching { client.loginAccount(account.serverUrl, account.userId, password) }
         .getOrElse {
-          _errorText.value = "Login failed: ${it.message}"
+          _errorText.value = appString(R.string.error_login_failed_detail, it.message ?: "")
           _connectionState.value = TestChatConnectionState.Error
           return false
         }
     if (response.ok != true || response.userId.isNullOrBlank()) {
-      _errorText.value = response.error ?: "Login failed"
+      _errorText.value = response.error ?: appString(R.string.error_login_failed)
       _connectionState.value = TestChatConnectionState.Error
       return false
     }
@@ -302,7 +323,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
           TestChatThread(
             chatId = chatId,
             title = title,
-            lastMessage = "New chat",
+            lastMessage = appString(R.string.msg_new_chat),
             lastTimestampMs = now,
           )
       snapshot.copy(threads = next)
@@ -354,6 +375,44 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     if (_activeChatId.value == chatId) {
       _activeChatId.value = null
     }
+    val now = System.currentTimeMillis()
+    updateSnapshot { snapshot ->
+      val updated =
+        snapshot.threads.map { thread ->
+          if (thread.chatId == chatId) {
+            thread.copy(
+              isDeleted = true,
+              deletedAt = now,
+              isArchived = false,
+              isPinned = false,
+              unreadCount = 0,
+            )
+          } else {
+            thread
+          }
+        }
+      snapshot.copy(threads = updated)
+    }
+  }
+
+  fun restoreThread(chatId: String) {
+    updateSnapshot { snapshot ->
+      val updated =
+        snapshot.threads.map { thread ->
+          if (thread.chatId == chatId) {
+            thread.copy(isDeleted = false, deletedAt = null)
+          } else {
+            thread
+          }
+        }
+      snapshot.copy(threads = updated)
+    }
+  }
+
+  fun purgeThread(chatId: String) {
+    if (_activeChatId.value == chatId) {
+      _activeChatId.value = null
+    }
     updateSnapshot { snapshot ->
       val filteredThreads = snapshot.threads.filterNot { it.chatId == chatId }
       val filteredMessages = snapshot.messages.filterNot { it.chatId == chatId }
@@ -366,14 +425,30 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val session = sessionName.trim().ifBlank { "main" }
     val chatId = "machine:${normalizedHost}/${session}"
     updateSnapshot { snapshot ->
-      if (snapshot.threads.any { it.chatId == chatId }) return@updateSnapshot snapshot
+      val existing = snapshot.threads.firstOrNull { it.chatId == chatId }
+      if (existing != null) {
+        if (!existing.isDeleted) return@updateSnapshot snapshot
+        val now = System.currentTimeMillis()
+        val restored =
+          existing.copy(
+            isDeleted = false,
+            deletedAt = null,
+            lastTimestampMs = now,
+            lastMessage = existing.lastMessage.ifBlank { appString(R.string.msg_start_chatting) },
+          )
+        val updatedThreads =
+          snapshot.threads.map { thread ->
+            if (thread.chatId == chatId) restored else thread
+          }
+        return@updateSnapshot snapshot.copy(threads = updatedThreads)
+      }
       val now = System.currentTimeMillis()
       val updated =
         snapshot.threads +
           TestChatThread(
             chatId = chatId,
             title = title.ifBlank { session },
-            lastMessage = "Start chatting",
+            lastMessage = appString(R.string.msg_start_chatting),
             lastTimestampMs = now,
           )
       snapshot.copy(threads = updated)
@@ -385,7 +460,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val chatId = _activeChatId.value ?: return
     if (text.isBlank()) return
     val host = resolveHostForChat(chatId) ?: run {
-      _errorText.value = "Host not found for this chat"
+      _errorText.value = appString(R.string.error_host_not_found)
       return
     }
     _errorText.value = null
@@ -420,13 +495,13 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
           client.sendMessage(credentials, chatId, message.text, message.senderName, messageId)
         }
           .getOrElse {
-            _errorText.value = "Send failed: ${it.message}"
+            _errorText.value = appString(R.string.error_send_failed_detail, it.message ?: "")
             updateMessageStatus(messageId, DELIVERY_FAILED)
             return@launch
           }
       response.use { res ->
         if (!res.isSuccessful) {
-          _errorText.value = "Send failed: ${res.code}"
+          _errorText.value = appString(R.string.error_send_failed_code, res.code)
           updateMessageStatus(messageId, DELIVERY_FAILED)
           return@use
         }
@@ -454,6 +529,8 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
             lastMessage = message.text,
             lastTimestampMs = message.timestampMs,
             unreadCount = if (incrementUnread) thread.unreadCount + 1 else thread.unreadCount,
+            isDeleted = false,
+            deletedAt = null,
           )
         }
       val updatedThreads =
@@ -583,7 +660,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
                 direction = "in",
                 text = output,
                 timestampMs = timestamp,
-                senderName = "Bot",
+                senderName = appString(R.string.label_bot),
                 replyToId = payload?.replyToId,
               )
             acknowledgeLatestOutgoing(chatId, payload?.replyToId)
@@ -606,7 +683,9 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
             response: Response?,
           ) {
             hostStates[host.label] = TestChatConnectionState.Error
-            _errorText.value = "${host.label}: ${t?.message ?: "Connection failed"}"
+            val reason = t?.message ?: appString(R.string.error_connection_failed)
+            _errorText.value =
+              appString(R.string.error_host_connection_failed, host.label, reason)
             updateConnectionState()
             scheduleReconnect(account, host)
           }
@@ -716,7 +795,11 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     if (snapshot.threads.isNotEmpty()) return
     if (_hosts.value.isEmpty()) return
     for (host in _hosts.value) {
-      createThread(title = "${host.label} session", hostLabel = host.label, sessionName = "main")
+      createThread(
+        title = appString(R.string.label_host_session, host.label),
+        hostLabel = host.label,
+        sessionName = "main",
+      )
     }
   }
 
