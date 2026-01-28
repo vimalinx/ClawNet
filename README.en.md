@@ -37,6 +37,8 @@ Install + configure the plugin (one-liner after clone):
 ./install.sh
 ```
 
+The script prompts for Server URL + token and writes the config (no onboard needed).
+
 Or install manually:
 
 ```bash

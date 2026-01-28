@@ -37,6 +37,8 @@ clawdbot gateway --port 18789 --verbose
 ./install.sh
 ```
 
+脚本会提示输入 Server URL 与 Token，并自动写入配置（无需再跑 onboard）。
+
 或手动安装并配置插件：
 
 ```bash
