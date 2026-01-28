@@ -21,6 +21,7 @@ class TestChatPrefs(context: Context) {
     private const val legacyTokenKey = "testchat.token"
     private const val lastEventIdsKey = "testchat.lastEventIds"
     private const val languageKey = "testchat.language"
+    private const val disclaimerKey = "testchat.disclaimerAccepted"
   }
 
   private val json = Json { ignoreUnknownKeys = true }
@@ -50,6 +51,9 @@ class TestChatPrefs(context: Context) {
 
   private val _languageTag = MutableStateFlow(loadLanguageTag())
   val languageTag: StateFlow<String> = _languageTag
+
+  private val _disclaimerAccepted = MutableStateFlow(loadDisclaimerAccepted())
+  val disclaimerAccepted: StateFlow<Boolean> = _disclaimerAccepted
 
   private val lastEventIds = loadLastEventIds().toMutableMap()
 
@@ -101,6 +105,13 @@ class TestChatPrefs(context: Context) {
       putString(languageKey, normalized)
     }
     _languageTag.value = normalized
+  }
+
+  fun saveDisclaimerAccepted() {
+    prefs.edit {
+      putBoolean(disclaimerKey, true)
+    }
+    _disclaimerAccepted.value = true
   }
 
   fun getLastEventId(hostLabel: String): Long? {
@@ -168,5 +179,9 @@ class TestChatPrefs(context: Context) {
 
   private fun loadLanguageTag(): String {
     return prefs.getString(languageKey, "system")?.trim().orEmpty().ifBlank { "system" }
+  }
+
+  private fun loadDisclaimerAccepted(): Boolean {
+    return prefs.getBoolean(disclaimerKey, false)
   }
 }

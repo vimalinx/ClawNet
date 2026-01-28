@@ -1,49 +1,48 @@
-# Vimalinx Server plugin
+# Vimalinx Server 插件
 
-English | [中文](README.zh.md)
+中文 | [English](README.en.md)
 
-Channel plugin that connects the Gateway to a Vimalinx Server. Supports poll or
-webhook inbound modes and token-based auth.
+该插件用于连接 Gateway 与 Vimalinx Server，支持轮询（poll）或 webhook 入站模式，并使用 Token 认证。
 
-## Requirements
+## 需求
 
-- Gateway running (Node 22+).
-- Vimalinx Server reachable at a base URL.
+- Gateway 运行中（Node 22+）。
+- 可访问的 Vimalinx Server。
 
-## Install
+## 安装
 
-From a local checkout:
+从本地仓库安装：
 
 ```bash
 clawdbot plugins install ./plugin
 ```
 
-For dev (no copy, live link):
+开发模式（不复制、软链接）：
 
 ```bash
 clawdbot plugins install -l ./plugin
 ```
 
-If the plugin shows as disabled:
+如果插件显示为禁用：
 
 ```bash
 clawdbot plugins enable test
 ```
 
-## Configure (wizard)
+## 配置（向导）
 
 ```bash
 clawdbot onboard
 ```
 
-The wizard will:
-- Ask for the Vimalinx server (official or custom URL).
-- Prompt for the token (from Vimagram).
-- Let you choose inbound mode (poll or webhook).
+向导会要求：
+- 选择服务器（官方 / 自定义 URL）。
+- 输入 Vimagram 生成的 Token。
+- 选择入站模式（poll 或 webhook）。
 
-## Configure (manual)
+## 配置（手动）
 
-Minimal config (single account):
+最小配置（单账号）：
 
 ```yaml
 channels:
@@ -54,19 +53,19 @@ channels:
     inboundMode: poll
 ```
 
-Optional fields:
-- `webhookPath` (default `/test-webhook`)
-- `webhookToken` (defaults to `token`)
+可选字段：
+- `webhookPath`（默认 `/test-webhook`）
+- `webhookToken`（默认等于 `token`）
 
-## Verify
+## 验证
 
 ```bash
 clawdbot channels status --probe
 ```
 
-If everything is healthy, the channel should show as connected/polling.
+若一切正常，状态会显示 connected/polling。
 
-## Related
+## 相关
 
-- Server: `server/README.md`
-- Android app: `app/README.md`
+- Server：`server/README.md`
+- Android App：`app/README.md`

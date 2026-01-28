@@ -126,4 +126,8 @@
     <string name="language_system">System</string>
     <string name="language_zh">Chinese</string>
     <string name="language_en">English</string>
+    <string name="disclaimer_title">Security notice</string>
+    <string name="disclaimer_body">This service does not guarantee security. Please protect sensitive information and use at your own risk.</string>
+    <string name="action_acknowledge">I understand</string>
+    <string name="action_exit">Exit</string>
 </resources>

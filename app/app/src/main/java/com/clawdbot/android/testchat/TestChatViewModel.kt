@@ -55,6 +55,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
   private val _password = MutableStateFlow(prefs.password.value)
   private val _hosts = MutableStateFlow(prefs.hosts.value)
   private val _languageTag = MutableStateFlow(prefs.languageTag.value)
+  private val _disclaimerAccepted = MutableStateFlow(prefs.disclaimerAccepted.value)
   private val _connectionState = MutableStateFlow(TestChatConnectionState.Disconnected)
   private val _errorText = MutableStateFlow<String?>(null)
   private val _snapshot = MutableStateFlow(TestChatSnapshot())
@@ -110,6 +111,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, TestChatUiState())
 
   val languageTag: StateFlow<String> = _languageTag
+  val disclaimerAccepted: StateFlow<Boolean> = _disclaimerAccepted
 
   init {
     val account = _account.value
@@ -281,6 +283,12 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     if (_languageTag.value == normalized) return
     prefs.saveLanguageTag(normalized)
     _languageTag.value = normalized
+  }
+
+  fun acceptDisclaimer() {
+    if (_disclaimerAccepted.value) return
+    prefs.saveDisclaimerAccepted()
+    _disclaimerAccepted.value = true
   }
 
   private suspend fun verifyAccountLogin(account: TestChatAccount, password: String): Boolean {

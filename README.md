@@ -1,22 +1,21 @@
 # Vimalinx Suite
 
-English | [中文](README.zh.md)
+中文 | [English](README.en.md)
 
-Vimalinx Suite is a full stack for the Vimalinx Server channel:
-- Server: `server`
-- Plugin: `plugin`
-- Android app (Vimagram): `app`
+Vimalinx Suite 是 Vimalinx Server 通道的全栈实现：
+- Server：`server`
+- Plugin：`plugin`
+- Android App（Vimagram）：`app`
 
-## Quickstart (local)
+## 快速启动（本地）
 
-Install deps:
+准备：安装 Node 22+，并全局安装 CLI。
 
 ```bash
-pnpm install
-pnpm build
+npm install -g clawdbot@latest
 ```
 
-Start the Vimalinx Server:
+启动 Vimalinx Server：
 
 ```bash
 export TEST_SERVER_PORT=8788
@@ -26,37 +25,36 @@ export TEST_ALLOW_REGISTRATION=true
 node server/server.mjs
 ```
 
-Start the Gateway:
+启动 Gateway：
 
 ```bash
-pnpm clawdbot gateway --port 18789 --verbose
+clawdbot gateway --port 18789 --verbose
 ```
 
-Install + configure the plugin:
+安装并配置插件：
 
 ```bash
-pnpm clawdbot plugins install ./plugin
-pnpm clawdbot onboard
+clawdbot plugins install ./plugin
+clawdbot onboard
 ```
 
-Verify:
+验证：
 
 ```bash
 clawdbot channels status --probe
 ```
 
-## Android app (Vimagram)
+## Android App（Vimagram）
 
 ```bash
 cd app
 ./gradlew :app:installDebug
 ```
 
-Then log in to the server, generate a host token in **Account**, and paste it in the
-plugin onboarding flow.
+登录服务器后，在 **Account** 生成主机 Token，并在插件向导里粘贴。
 
-## Docs
+## 使用说明
 
-- Server: `server/README.md`
-- Plugin: `plugin/README.md`
-- Android app: `app/README.md`
+- Server：`server/README.md`
+- Plugin：`plugin/README.md`
+- Android App：`app/README.md`

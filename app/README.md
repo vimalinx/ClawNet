@@ -1,19 +1,18 @@
-## Vimagram (Android)
+## Vimagram（Android）
 
-English | [中文](README.zh.md)
+中文 | [English](README.en.md)
 
-Android client for the Vimalinx Server channel. Use it to register/login,
-generate host tokens, and chat.
+Vimalinx Server 的 Android 客户端，用于注册/登录、生成主机 Token、聊天。
 
-Highlights:
-- Connects directly to Vimalinx Server (not the Gateway).
-- Host tokens live in **Account** for easy recovery.
-- Language toggle (System/Chinese/English).
+特点：
+- 直接连接 Vimalinx Server（不经过 Gateway）。
+- 账号页展示已连接主机 Token，方便恢复。
+- 支持语言切换（系统/中文/English）。
 
-## Open in Android Studio
-- Open the folder `app`.
+## 用 Android Studio 打开
+- 打开 `app` 目录。
 
-## Build / Run
+## 构建 / 运行
 
 ```bash
 cd app
@@ -22,24 +21,24 @@ cd app
 ./gradlew :app:testDebugUnitTest
 ```
 
-For a release build:
+Release 构建：
 
 ```bash
 ./gradlew :app:assembleRelease
 ```
 
-`gradlew` auto-detects the Android SDK at `~/Library/Android/sdk` (macOS default) if
-`ANDROID_SDK_ROOT` / `ANDROID_HOME` are unset.
+若未设置 `ANDROID_SDK_ROOT` / `ANDROID_HOME`，`gradlew` 会默认寻找
+`~/Library/Android/sdk`（macOS 默认路径）。
 
-## Connect to Vimalinx Server
+## 连接 Vimalinx Server
 
-1) Start the server (see `server/README.md`).
-2) In Vimagram, register or log in with the server URL and your user ID.
-3) Generate a host token from **Account** and copy it.
-4) In the gateway CLI, install/configure the Vimalinx Server plugin
-   (see `plugin/README.md`) and paste the token.
+1) 启动服务器（见 `server/README.md`）。
+2) 在 Vimagram 中输入服务器地址，注册或登录。
+3) 在 **Account** 里生成主机 Token 并复制。
+4) 在网关 CLI 中安装并配置 Vimalinx Server 插件
+   （见 `plugin/README.md`），粘贴 Token。
 
-## Notes
+## 备注
 
-- Debug builds can be installed directly with `:app:installDebug`.
-- If the device prompts for install permissions, approve it to finish the install.
+- Debug 包可用 `:app:installDebug` 直接安装。
+- 设备弹出安装权限时，请允许继续安装。

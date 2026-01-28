@@ -112,6 +112,7 @@ import java.time.format.DateTimeFormatter
 fun TestChatApp(viewModel: TestChatViewModel) {
   val state by viewModel.uiState.collectAsState()
   val languageTag by viewModel.languageTag.collectAsState()
+  val disclaimerAccepted by viewModel.disclaimerAccepted.collectAsState()
   val context = LocalContext.current
   var registrationUserId by remember { mutableStateOf<String?>(null) }
   var currentTab by rememberSaveable { mutableStateOf(MainTab.Chat) }
@@ -197,6 +198,24 @@ fun TestChatApp(viewModel: TestChatViewModel) {
       confirmButton = {
         TextButton(onClick = { registrationUserId = null }) {
           Text(stringResource(R.string.action_ok))
+        }
+      },
+    )
+  }
+
+  if (!disclaimerAccepted) {
+    AlertDialog(
+      onDismissRequest = {},
+      title = { Text(stringResource(R.string.disclaimer_title)) },
+      text = { Text(stringResource(R.string.disclaimer_body)) },
+      confirmButton = {
+        TextButton(onClick = { viewModel.acceptDisclaimer() }) {
+          Text(stringResource(R.string.action_acknowledge))
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { (context as? Activity)?.finish() }) {
+          Text(stringResource(R.string.action_exit))
         }
       },
     )

@@ -126,4 +126,8 @@
     <string name="language_system">跟随系统</string>
     <string name="language_zh">中文</string>
     <string name="language_en">英文</string>
+    <string name="disclaimer_title">安全提示</string>
+    <string name="disclaimer_body">本服务不保证安全，请注意信息安全风险。</string>
+    <string name="action_acknowledge">我知道了</string>
+    <string name="action_exit">退出</string>
 </resources>

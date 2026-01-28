@@ -1,0 +1,61 @@
+# Vimalinx Suite
+
+English | [中文](README.md)
+
+Vimalinx Suite is the full stack for the Vimalinx Server channel:
+- Server: `server`
+- Plugin: `plugin`
+- Android app (Vimagram): `app`
+
+## Quickstart (local)
+
+Prereqs: Node 22+ and the CLI.
+
+```bash
+npm install -g clawdbot@latest
+```
+
+Start the Vimalinx Server:
+
+```bash
+export TEST_SERVER_PORT=8788
+export TEST_USERS_FILE=/path/to/vimalinx-users.json
+export TEST_ALLOW_REGISTRATION=true
+
+node server/server.mjs
+```
+
+Start the Gateway:
+
+```bash
+clawdbot gateway --port 18789 --verbose
+```
+
+Install + configure the plugin:
+
+```bash
+clawdbot plugins install ./plugin
+clawdbot onboard
+```
+
+Verify:
+
+```bash
+clawdbot channels status --probe
+```
+
+## Android app (Vimagram)
+
+```bash
+cd app
+./gradlew :app:installDebug
+```
+
+Then log in to the server, generate a host token in **Account**, and paste it in the
+plugin onboarding flow.
+
+## Docs
+
+- Server: `server/README.md`
+- Plugin: `plugin/README.md`
+- Android app: `app/README.md`
