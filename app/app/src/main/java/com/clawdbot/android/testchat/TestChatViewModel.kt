@@ -846,8 +846,12 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
 
   private suspend fun loadAccount(account: TestChatAccount) {
     val snapshot = store.load(getApplication(), account)
-    _snapshot.value = snapshot
-    ensureDefaultThread(snapshot)
+    val cleaned = dedupeThreads(snapshot)
+    _snapshot.value = cleaned
+    if (cleaned.threads.size != snapshot.threads.size) {
+      schedulePersist()
+    }
+    ensureDefaultThread(cleaned)
   }
 
   private fun ensureDefaultThread(snapshot: TestChatSnapshot) {
@@ -863,9 +867,44 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
   }
 
   private fun updateSnapshot(transform: (TestChatSnapshot) -> TestChatSnapshot) {
-    val next = transform(_snapshot.value)
+    val next = dedupeThreads(transform(_snapshot.value))
     _snapshot.value = next
     schedulePersist()
+  }
+
+  private fun dedupeThreads(snapshot: TestChatSnapshot): TestChatSnapshot {
+    if (snapshot.threads.size <= 1) return snapshot
+    val merged = LinkedHashMap<String, TestChatThread>()
+    for (thread in snapshot.threads) {
+      val existing = merged[thread.chatId]
+      if (existing == null) {
+        merged[thread.chatId] = thread
+        continue
+      }
+      val latest = if (thread.lastTimestampMs >= existing.lastTimestampMs) thread else existing
+      val mergedUnread = maxOf(existing.unreadCount, thread.unreadCount)
+      val mergedPinned = existing.isPinned || thread.isPinned
+      val mergedArchived = existing.isArchived && thread.isArchived
+      val mergedDeleted = existing.isDeleted && thread.isDeleted
+      val mergedDeletedAt =
+        if (mergedDeleted) {
+          listOfNotNull(existing.deletedAt, thread.deletedAt).maxOrNull()
+        } else {
+          null
+        }
+      val mergedThread =
+        latest.copy(
+          title = latest.title.ifBlank { existing.title },
+          lastMessage = latest.lastMessage.ifBlank { existing.lastMessage },
+          unreadCount = mergedUnread,
+          isPinned = mergedPinned,
+          isArchived = mergedArchived,
+          isDeleted = mergedDeleted,
+          deletedAt = mergedDeletedAt,
+        )
+      merged[thread.chatId] = mergedThread
+    }
+    return snapshot.copy(threads = merged.values.toList())
   }
 
   private fun schedulePersist() {
