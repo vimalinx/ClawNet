@@ -419,9 +419,9 @@ function readSignatureHeaders(req: IncomingMessage): {
   nonce: string;
   signature: string;
 } {
-  const timestampRaw = String(req.headers["x-test-timestamp"] ?? "").trim();
-  const nonce = String(req.headers["x-test-nonce"] ?? "").trim();
-  const signature = String(req.headers["x-test-signature"] ?? "").trim();
+  const timestampRaw = String(req.headers["x-vimalinx-timestamp"] ?? "").trim();
+  const nonce = String(req.headers["x-vimalinx-nonce"] ?? "").trim();
+  const signature = String(req.headers["x-vimalinx-signature"] ?? "").trim();
   const timestamp = Number(timestampRaw);
   return {
     timestamp: Number.isFinite(timestamp) ? timestamp : null,
@@ -533,7 +533,7 @@ function extractUserIdFromChatId(chatId?: string): string | null {
   if (!chatId) return null;
   const trimmed = chatId.trim();
   if (trimmed.startsWith("user:")) return trimmed.slice("user:".length).trim();
-  if (trimmed.startsWith("test:")) return trimmed.slice("test:".length).trim();
+  if (trimmed.startsWith("vimalinx:")) return trimmed.slice("vimalinx:".length).trim();
   return trimmed || null;
 }
 
@@ -764,9 +764,9 @@ async function forwardToGateway(message: InboundMessage, user: UserRecord) {
     const timestamp = Date.now();
     const nonce = randomUUID();
     const signature = createSignature({ secret: hmacSecret, timestamp, nonce, body });
-    headers["x-test-timestamp"] = String(timestamp);
-    headers["x-test-nonce"] = nonce;
-    headers["x-test-signature"] = signature;
+    headers["x-vimalinx-timestamp"] = String(timestamp);
+    headers["x-vimalinx-nonce"] = nonce;
+    headers["x-vimalinx-signature"] = signature;
   }
 
   const res = await fetch(targetUrl, {
@@ -789,7 +789,7 @@ function readBearerToken(req: IncomingMessage): string {
 }
 
 function readUserIdHeader(req: IncomingMessage): string {
-  return String(req.headers["x-test-user"] ?? "").trim();
+  return String(req.headers["x-vimalinx-user"] ?? "").trim();
 }
 
 function verifyServerToken(req: IncomingMessage, user: UserRecord | null): boolean {
