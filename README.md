@@ -2,17 +2,18 @@
 
 中文 | [English](README.en.md)
 
-Vimalinx Suite 是 Vimalinx Server 通道的全栈实现：
+Vimalinx Suite Core 是 Clawdbot 的私人服务器解决方案，让机器人（Bots）和移动应用通过自托管服务器通信，无需依赖中心化平台。
 
 **核心组件：**
-- **Server**：聊天服务器，提供用户注册、登录、Token管理、消息收发等功能
-- **Plugin**：用于连接 Gateway 与 Vimalinx Server 的插件，支持轮询（poll）和 webhook 入站模式
-- **Android App（Vimagram）**：移动端客户端，用于注册/登录、生成主机 Token、聊天
+- **Server**：自托管聊天服务器，提供用户管理、Token 认证、消息收发等功能
+- **Plugin**：Gateway 插件，通过轮询（poll）或 webhook 将 Clawdbot 连接到你的 Vimalinx 服务器
+- **Android App（Vimagram）**：移动端客户端，用于注册、生成 Token、聊天
 
 **适用场景：**
-- 想要在 Gateway 中接入 Vimalinx Server 消息通道的用户
-- 需要一个自托管聊天服务器的开发者
-- 通过手机 App 管理账号和 Token 的场景
+- 为 Clawdbot 机器人部署私人聊天基础设施
+- 自托管消息服务，不依赖中心化平台
+- 通过移动端管理账号和 Token
+- 完全掌控你的通信数据
 
 ---
 
@@ -23,7 +24,7 @@ Vimalinx Suite 是 Vimalinx Server 通道的全栈实现：
 ### 前置要求
 
 - 已安装 Node.js 22+
-- 已安装 `clawdbot` CLI（Gateway 工具）
+- 已安装并配置 `clawdbot` CLI（Gateway 工具）
 - 一台 Android 手机（用于获取 Token）
 
 ### 安装步骤
@@ -187,7 +188,7 @@ cd app
 
 **方式二：下载 APK（普通用户）**
 
-从 GitHub Releases 下载最新 APK（推荐）。
+联系项目维护者获取 APK 安装包。
 
 ### 使用 App
 
