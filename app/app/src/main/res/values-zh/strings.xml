@@ -71,6 +71,8 @@
     <string name="label_connection_detail">%1$s@%2$s · %3$s · 最近 %4$s</string>
     <string name="label_server">服务器</string>
     <string name="action_add_server">添加服务器</string>
+    <string name="action_test_server">测试服务器</string>
+    <string name="status_testing">测试中...</string>
     <string name="info_no_hosts_available">暂无可用主机</string>
     <string name="label_host">主机</string>
     <string name="label_pinned">已置顶</string>
@@ -102,6 +104,10 @@
     <string name="label_host_session">%1$s 会话</string>
     <string name="error_login_failed_detail">登录失败：%1$s</string>
     <string name="error_login_failed">登录失败</string>
+    <string name="error_server_url_required">需要填写服务器地址</string>
+    <string name="msg_server_test_success">服务器可访问</string>
+    <string name="msg_server_test_failed">服务器不可用</string>
+    <string name="msg_server_test_failed_detail">服务器不可用：%1$s</string>
     <string name="msg_new_chat">新对话</string>
     <string name="msg_start_chatting">开始聊天</string>
     <string name="error_host_not_found">找不到该会话对应的主机</string>

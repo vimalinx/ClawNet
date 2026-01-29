@@ -71,6 +71,8 @@
     <string name="label_connection_detail">%1$s@%2$s · %3$s · last %4$s</string>
     <string name="label_server">Server</string>
     <string name="action_add_server">Add server</string>
+    <string name="action_test_server">Test server</string>
+    <string name="status_testing">Testing...</string>
     <string name="info_no_hosts_available">No hosts available</string>
     <string name="label_host">Host</string>
     <string name="label_pinned">Pinned</string>
@@ -102,6 +104,10 @@
     <string name="label_host_session">%1$s session</string>
     <string name="error_login_failed_detail">Login failed: %1$s</string>
     <string name="error_login_failed">Login failed</string>
+    <string name="error_server_url_required">Server URL required</string>
+    <string name="msg_server_test_success">Server reachable</string>
+    <string name="msg_server_test_failed">Server test failed</string>
+    <string name="msg_server_test_failed_detail">Server test failed: %1$s</string>
     <string name="msg_new_chat">New chat</string>
     <string name="msg_start_chatting">Start chatting</string>
     <string name="error_host_not_found">Host not found for this chat</string>
