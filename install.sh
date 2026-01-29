@@ -3,7 +3,8 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="${REPO_DIR}/plugin"
-TARGET_DIR="${VIMALINX_PLUGIN_DIR:-$HOME/.clawdbot/extensions/vimalinx-server-plugin}"
+TARGET_DIR="${VIMALINX_PLUGIN_DIR:-$HOME/.clawdbot/extensions/test}"
+LEGACY_DIR="$HOME/.clawdbot/extensions/vimalinx-server-plugin"
 CONFIG_PATH="${CLAWDBOT_CONFIG:-$HOME/.clawdbot/clawdbot.json}"
 DEFAULT_SERVER_URL="https://vimagram.vimalinx.xyz"
 SERVER_URL="${VIMALINX_SERVER_URL:-}"
@@ -55,8 +56,11 @@ PY
 fi
 
 echo "Installing Vimalinx Server plugin to: ${TARGET_DIR}"
+if [[ -d "${LEGACY_DIR}" && "${LEGACY_DIR}" != "${TARGET_DIR}" ]]; then
+  rm -rf "${LEGACY_DIR}"
+fi
 if [[ -d "${TARGET_DIR}" ]]; then
-  if [[ "${TARGET_DIR}" == "${HOME}/.clawdbot/extensions/vimalinx-server-plugin" || "${VIMALINX_FORCE_OVERWRITE:-}" == "1" ]]; then
+  if [[ "${TARGET_DIR}" == "${HOME}/.clawdbot/extensions/test" || "${VIMALINX_FORCE_OVERWRITE:-}" == "1" ]]; then
     rm -rf "${TARGET_DIR}"
   else
     echo "Target already exists: ${TARGET_DIR}" >&2
