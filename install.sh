@@ -155,10 +155,12 @@ if [[ "${VIMALINX_SKIP_DOCTOR_FIX:-}" != "1" ]]; then
 fi
 
 if [[ "${VIMALINX_SKIP_GATEWAY_START:-}" != "1" ]]; then
+  clawdbot gateway stop >/dev/null 2>&1 || true
   clawdbot gateway start >/dev/null 2>&1 || true
 fi
 
 if [[ "${VIMALINX_SKIP_STATUS:-}" != "1" ]]; then
+  sleep 2
   clawdbot channels status --probe || true
 fi
 
