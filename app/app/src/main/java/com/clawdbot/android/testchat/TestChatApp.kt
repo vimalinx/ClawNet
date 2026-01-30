@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,9 +89,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
@@ -958,14 +961,20 @@ private fun ChatScreen(
   val listState = rememberLazyListState()
   val messageTextSize = resolveMessageTextSize()
   val markdown = rememberMarkwon(messageTextSize)
+  var didInitialScroll by remember(chatId) { mutableStateOf(false) }
 
   BackHandler(enabled = true) {
     onBack()
   }
 
-  LaunchedEffect(state.messages.size) {
+  LaunchedEffect(chatId, state.messages.size) {
     if (state.messages.isNotEmpty()) {
-      listState.animateScrollToItem(state.messages.size - 1)
+      if (!didInitialScroll) {
+        listState.scrollToItem(state.messages.size - 1)
+        didInitialScroll = true
+      } else {
+        listState.animateScrollToItem(state.messages.size - 1)
+      }
     }
   }
 
@@ -1178,6 +1187,12 @@ private fun AccountDashboardScreen(
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
           },
         )
+        SectionHeader(text = stringResource(R.string.title_links))
+        LinksSection(
+          onOpenLink = { url ->
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+          },
+        )
       }
     }
   }
@@ -1288,6 +1303,43 @@ private fun UpdateSettingsSection(
         ) {
           Text(stringResource(R.string.action_view_release))
         }
+      }
+    }
+  }
+}
+
+@Composable
+private fun LinksSection(
+  onOpenLink: (String) -> Unit,
+) {
+  val xhsUrl = "https://xhslink.com/m/487YEE3Jygk"
+  val siteUrl = "https://vimalinx.xyz"
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column(
+      modifier = Modifier.padding(12.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+      Text(text = stringResource(R.string.label_xhs), style = MaterialTheme.typography.titleSmall)
+      Image(
+        painter = painterResource(R.drawable.xhs),
+        contentDescription = stringResource(R.string.label_xhs),
+        contentScale = ContentScale.Crop,
+        modifier =
+          Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onOpenLink(xhsUrl) },
+      )
+      Text(text = stringResource(R.string.label_website), style = MaterialTheme.typography.titleSmall)
+      OutlinedButton(
+        onClick = { onOpenLink(siteUrl) },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(siteUrl)
       }
     }
   }

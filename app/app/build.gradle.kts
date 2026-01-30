@@ -25,9 +25,24 @@ android {
     versionName = "2026.1.24"
   }
 
+  val releaseStoreFile = project.findProperty("VIMAGRAM_RELEASE_STORE_FILE") as String?
+  val releaseStorePassword = project.findProperty("VIMAGRAM_RELEASE_STORE_PASSWORD") as String?
+  val releaseKeyAlias = project.findProperty("VIMAGRAM_RELEASE_KEY_ALIAS") as String?
+  val releaseKeyPassword = project.findProperty("VIMAGRAM_RELEASE_KEY_PASSWORD") as String?
+
+  signingConfigs {
+    create("release") {
+      storeFile = releaseStoreFile?.let { file(it) }
+      storePassword = releaseStorePassword
+      keyAlias = releaseKeyAlias
+      keyPassword = releaseKeyPassword
+    }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = false
+      signingConfig = signingConfigs.getByName("release")
     }
   }
 
