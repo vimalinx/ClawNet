@@ -41,7 +41,7 @@ if [[ -z "${PLUGIN_SRC}" ]]; then
 fi
 
 echo "Installing plugin into OpenClaw from: ${PLUGIN_SRC}"
-openclaw plugins install "${PLUGIN_SRC}"
+openclaw plugins install "${PLUGIN_SRC}" >/dev/null 2>&1 || true
 openclaw plugins enable vimalinx >/dev/null 2>&1 || true
 
 cat <<EOF

@@ -29,7 +29,7 @@ rsync -a --delete "${PLUGIN_DIR}/" "${TARGET_DIR}/"
 cd "${TARGET_DIR}"
 npm install --omit=dev
 
-openclaw plugins install "${TARGET_DIR}"
+openclaw plugins install "${TARGET_DIR}" >/dev/null 2>&1 || true
 
 cat <<'EOF'
 Done.

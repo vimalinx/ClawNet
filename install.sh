@@ -96,7 +96,8 @@ else
 fi
 
 # Ensure OpenClaw discovers the plugin before config validation.
-openclaw plugins install "${TARGET_DIR}" >/dev/null
+# `openclaw plugins install` errors if the plugin is already installed; keep the script rerunnable.
+openclaw plugins install "${TARGET_DIR}" >/dev/null 2>&1 || true
 openclaw plugins enable vimalinx >/dev/null 2>&1 || true
 
 server_url_default="${existing_server_url:-$DEFAULT_SERVER_URL}"
