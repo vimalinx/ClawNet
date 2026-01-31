@@ -30,35 +30,47 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+existing_server_url=""
+existing_inbound_mode=""
+existing_token=""
 if [[ -f "${CONFIG_PATH}" ]]; then
-  python3 - "${CONFIG_PATH}" <<'PY'
+  while IFS= read -r line; do
+    case "$line" in
+      server_url=*) existing_server_url="${line#server_url=}" ;;
+      inbound_mode=*) existing_inbound_mode="${line#inbound_mode=}" ;;
+      token=*) existing_token="${line#token=}" ;;
+    esac
+  done < <(python3 - "${CONFIG_PATH}" <<'PY'
 import json
-import os
 import sys
 
 config_path = sys.argv[1]
-
 try:
   with open(config_path, "r", encoding="utf-8") as f:
     config = json.load(f)
 except Exception:
   raise SystemExit(0)
 
-plugins = config.get("plugins")
-if not isinstance(plugins, dict):
-  plugins = {}
-entries = plugins.get("entries")
-if not isinstance(entries, dict):
-  entries = {}
+channels = config.get("channels")
+if not isinstance(channels, dict):
+  raise SystemExit(0)
+cfg = channels.get("vimalinx")
+if not isinstance(cfg, dict):
+  raise SystemExit(0)
 
-if "vimalinx-server-plugin" in entries:
-  entries.pop("vimalinx-server-plugin", None)
-  plugins["entries"] = entries
-  config["plugins"] = plugins
-  with open(config_path, "w", encoding="utf-8") as f:
-    json.dump(config, f, indent=2, ensure_ascii=True)
-    f.write("\n")
+base_url = cfg.get("baseUrl") or ""
+inbound_mode = cfg.get("inboundMode") or ""
+token = cfg.get("token") or ""
+
+print(f"server_url={str(base_url)}")
+print(f"inbound_mode={str(inbound_mode)}")
+print(f"token={str(token)}")
 PY
+  )
+fi
+
+if [[ -z "${VIMALINX_INBOUND_MODE:-}" && -n "${existing_inbound_mode}" ]]; then
+  INBOUND_MODE="${existing_inbound_mode}"
 fi
 
 echo "Installing Vimalinx Server plugin to: ${TARGET_DIR}"
@@ -87,19 +99,26 @@ fi
 openclaw plugins install "${TARGET_DIR}" >/dev/null
 openclaw plugins enable vimalinx >/dev/null 2>&1 || true
 
-if [[ -z "${SERVER_URL}" ]]; then
-  read -r -p "Vimalinx Server URL [${DEFAULT_SERVER_URL}]: " SERVER_URL
+server_url_default="${existing_server_url:-$DEFAULT_SERVER_URL}"
+if [[ -t 0 ]]; then
+  read -r -p "Vimalinx Server URL [${server_url_default}]: " SERVER_URL
+else
+  SERVER_URL="${SERVER_URL:-$server_url_default}"
 fi
-SERVER_URL="${SERVER_URL:-$DEFAULT_SERVER_URL}"
+SERVER_URL="${SERVER_URL:-$server_url_default}"
 if [[ ! "${SERVER_URL}" =~ ^https?:// ]]; then
   SERVER_URL="https://${SERVER_URL}"
 fi
 SERVER_URL="${SERVER_URL%/}"
 
-if [[ -z "${TOKEN}" ]]; then
-  read -r -s -p "Vimalinx token: " TOKEN
+if [[ -t 0 ]]; then
+  read -r -s -p "Vimalinx token (leave blank to keep existing): " TOKEN
   echo
+  if [[ -z "${TOKEN}" ]]; then
+    TOKEN="${existing_token}" 
+  fi
 fi
+TOKEN="${TOKEN:-$existing_token}"
 TOKEN="$(printf "%s" "${TOKEN}" | tr -d '\r\n' | xargs)"
 if [[ -z "${TOKEN}" ]]; then
   echo "Missing Vimalinx token." >&2
@@ -176,6 +195,7 @@ if not isinstance(plugins, dict):
 entries = plugins.get("entries")
 if not isinstance(entries, dict):
   entries = {}
+entries.pop("vimalinx-server-plugin", None)
 entries.pop("test", None)
 entries["vimalinx"] = {**entries.get("vimalinx", {}), "enabled": True}
 plugins["entries"] = entries
