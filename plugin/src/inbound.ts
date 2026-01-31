@@ -5,7 +5,7 @@ import {
   resolveNestedAllowlistDecision,
   type ClawdbotConfig,
   type RuntimeEnv,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 
 import type { ResolvedTestAccount } from "./accounts.js";
 import {

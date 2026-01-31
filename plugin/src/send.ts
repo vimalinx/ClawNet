@@ -1,4 +1,4 @@
-import type { OutboundDeliveryResult } from "clawdbot/plugin-sdk";
+import type { OutboundDeliveryResult } from "openclaw/plugin-sdk";
 
 import { resolveTestAccount } from "./accounts.js";
 import {

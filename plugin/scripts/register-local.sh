@@ -6,7 +6,7 @@ USER_ID="${TEST_USER_ID:-}"
 DISPLAY_NAME="${TEST_DISPLAY_NAME:-}"
 PASSWORD="${TEST_PASSWORD:-}"
 SERVER_TOKEN="${TEST_SERVER_TOKEN:-}"
-CONFIG_PATH="${TEST_CONFIG_PATH:-$HOME/.clawdbot/clawdbot.json}"
+CONFIG_PATH="${TEST_CONFIG_PATH:-$HOME/.openclaw/openclaw.json}"
 
 usage() {
   cat <<'EOF'
@@ -158,5 +158,5 @@ with open(config_path, "w", encoding="utf-8") as f:
 
 print("Registered user:", user_id)
 print("Updated config:", config_path)
-print("Restart: clawdbot gateway restart")
+print("Restart: openclaw gateway restart")
 PY

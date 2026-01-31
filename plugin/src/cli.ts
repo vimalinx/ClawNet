@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type { ClawdbotConfig, PluginRuntime } from "clawdbot/plugin-sdk";
+import type { ClawdbotConfig, PluginRuntime } from "openclaw/plugin-sdk";
 
 import type { TestAccountConfig } from "./types.js";
 
@@ -110,7 +110,7 @@ export function registerVimalinxCli(params: {
         });
 
         logger.info?.(`Registered "${data.userId}" and updated config.`);
-        logger.info?.("Restart: clawdbot gateway restart");
+        logger.info?.("Restart: openclaw gateway restart");
       },
     );
 }

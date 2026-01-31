@@ -4,13 +4,13 @@ import type {
   ClawdbotConfig,
   DmPolicy,
   WizardPrompter,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 import {
   DEFAULT_ACCOUNT_ID,
   addWildcardAllowFrom,
   normalizeAccountId,
   promptAccountId,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 
 import {
   listTestAccountIds,

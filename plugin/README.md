@@ -21,7 +21,7 @@
 ## 📋 前置要求
 
 - **Node.js 22+**：运行 Gateway 的必需版本
-- **clawdbot CLI**：已安装并配置好的 Gateway 命令行工具
+- **openclaw CLI**：已安装并配置好的 Gateway 命令行工具
 - **Vimalinx Server**：一个可访问的 Vimalinx Server 实例
 - **Token**：从 Vimagram App 获取的用户 Token
 
@@ -41,14 +41,14 @@ cd vimalinx-suite-core
 
 安装脚本会自动完成以下操作：
 
-1. **检查依赖**：验证 `clawdbot`、`curl`、`python3` 是否已安装
-2. **复制插件**：将插件文件复制到 `~/.clawdbot/extensions/vimalinx`
+1. **检查依赖**：验证 `openclaw`、`curl`、`python3` 是否已安装
+2. **复制插件**：将插件文件复制到 `~/.openclaw/extensions/vimalinx`
 3. **交互式配置**：
    - 输入 Vimalinx Server URL（直接回车使用默认服务器）
    - 输入从 Vimagram App 复制的 Token
    - 选择入站模式（poll 或 webhook）
 4. **自动登录验证**：使用 Token 登录服务器，获取用户信息
-5. **写入配置**：自动更新 `~/.clawdbot/clawdbot.json`
+5. **写入配置**：自动更新 `~/.openclaw/openclaw.json`
 6. **重启服务**：自动重启 Gateway
 7. **验证连接**：检查插件状态
 
@@ -75,10 +75,10 @@ export VIMALINX_INBOUND_MODE="poll"
 
 ### 方式二：使用向导配置
 
-如果已安装插件，可以使用 `clawdbot onboard` 向导进行配置：
+如果已安装插件，可以使用 `openclaw onboard` 向导进行配置：
 
 ```bash
-clawdbot onboard
+openclaw onboard
 ```
 
 向导会要求：
@@ -88,7 +88,7 @@ clawdbot onboard
 
 ### 方式三：手动配置
 
-手动编辑 `~/.clawdbot/clawdbot.json` 文件。
+手动编辑 `~/.openclaw/openclaw.json` 文件。
 
 **最小配置（单账号）：**
 
@@ -194,7 +194,7 @@ clawdbot onboard
 ### 检查插件状态
 
 ```bash
-clawdbot channels status --probe
+openclaw channels status --probe
 ```
 
 **正常输出示例：**
@@ -210,7 +210,7 @@ Server: http://123.60.21.129:8788
 ### 检查 Gateway 日志
 
 ```bash
-clawdbot gateway logs
+openclaw gateway logs
 ```
 
 查看插件加载和连接相关的日志信息。
@@ -243,10 +243,10 @@ export VIMALINX_TOKEN="new-token"
 ./install.sh
 ```
 
-或者手动编辑 `~/.clawdbot/clawdbot.json`，然后重启 Gateway：
+或者手动编辑 `~/.openclaw/openclaw.json`，然后重启 Gateway：
 
 ```bash
-clawdbot gateway restart
+openclaw gateway restart
 ```
 
 ---
@@ -255,20 +255,20 @@ clawdbot gateway restart
 
 ### 问题 1：插件无法启动
 
-**症状**：`clawdbot channels status` 显示插件未加载
+**症状**：`openclaw channels status` 显示插件未加载
 
 **解决方法**：
-1. 检查插件文件是否存在：`ls ~/.clawdbot/extensions/vimalinx`
+1. 检查插件文件是否存在：`ls ~/.openclaw/extensions/vimalinx`
 2. 检查 Gateway 配置中是否启用了插件：
    ```bash
-   clawdbot config
+   openclaw config
    ```
-3. 查看 Gateway 日志：`clawdbot gateway logs`
-4. 运行依赖检查：`clawdbot doctor --fix`
+3. 查看 Gateway 日志：`openclaw gateway logs`
+4. 运行依赖检查：`openclaw doctor --fix`
 
 ### 问题 2：连接失败（connected 状态异常）
 
-**症状**：`clawdbot channels status --probe` 显示连接失败
+**症状**：`openclaw channels status --probe` 显示连接失败
 
 **可能原因和解决方法：**
 
@@ -305,7 +305,7 @@ clawdbot gateway restart
 3. **权限配置**：检查 `dmPolicy` 和 `allowFrom` 配置
 4. **查看详细日志**：
    ```bash
-   clawdbot gateway logs --level debug
+   openclaw gateway logs --level debug
    ```
 
 ### 问题 4：安装脚本执行失败
@@ -314,8 +314,8 @@ clawdbot gateway restart
 
 **常见错误和解决方法：**
 
-1. **`clawdbot not found in PATH`**
-   - 安装 CLI：`npm install -g clawdbot@latest`
+1. **`openclaw not found in PATH`**
+- 安装 CLI：`npm install -g openclaw@latest`
 
 2. **`python3 not found in PATH`**
    - 安装 Python 3

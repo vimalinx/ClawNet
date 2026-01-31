@@ -1,4 +1,4 @@
-import type { DmPolicy, GroupPolicy } from "clawdbot/plugin-sdk";
+import type { DmPolicy, GroupPolicy } from "openclaw/plugin-sdk";
 
 export type TestGroupConfig = {
   requireMention?: boolean;

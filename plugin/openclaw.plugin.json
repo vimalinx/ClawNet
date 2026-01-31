@@ -1,0 +1,9 @@
+{
+  "id": "vimalinx",
+  "channels": ["vimalinx"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

@@ -21,7 +21,7 @@ Simplest (customers): clone the repo and run at the root:
 ## Configure (wizard)
 
 ```bash
-clawdbot onboard
+openclaw onboard
 ```
 
 The wizard will:
@@ -49,7 +49,7 @@ Optional fields:
 ## Verify
 
 ```bash
-clawdbot channels status --probe
+openclaw channels status --probe
 ```
 
 If everything is healthy, the channel should show as connected/polling.

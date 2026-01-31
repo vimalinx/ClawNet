@@ -10,7 +10,7 @@ import {
   type ChannelGroupContext,
   type ChannelPlugin,
   type ClawdbotConfig,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 import {
   listTestAccountIds,
   resolveDefaultTestAccountId,
