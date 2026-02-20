@@ -239,7 +239,7 @@ sudo bash scripts/deploy-server-interactive.sh
 该脚本会自动完成（服务器侧）：
 
 1. 安装依赖（Node.js 22+、git、python3 等）
-2. 部署并启动 `vimalinx-server` systemd 服务
+2. 部署并启动 `vima-clawnet-server` systemd 服务
 3. 生成/更新服务环境文件并持久化用户数据
 
 第二步，在本地 OpenClaw 机器上（安装插件并接入服务器）：
