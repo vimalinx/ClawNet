@@ -15,7 +15,7 @@ Options:
   --data-dir <path>                Data directory (default: /var/lib/vimalinx)
   --users-file <path>              Users file path (default: <data-dir>/users.json)
   --machines-file <path>           Machine pool file path (default: <data-dir>/machines.json)
-  --port <port>                    Server port (default: 8788)
+  --port <port>                    Server port (default: 18788)
   --bind-host <host>               Bind host (default: 0.0.0.0)
   --inbound-mode <poll|webhook>    Server inbound mode (default: poll)
   --allow-registration <bool>      Allow registration (default: true)
@@ -126,7 +126,7 @@ INSTALL_DIR="${VIMALINX_INSTALL_DIR:-/opt/vimalinx-suite-core}"
 DATA_DIR="${VIMALINX_DATA_DIR:-/var/lib/vimalinx}"
 USERS_FILE="${VIMALINX_USERS_FILE:-${DATA_DIR}/users.json}"
 MACHINES_FILE="${VIMALINX_MACHINES_FILE:-${DATA_DIR}/machines.json}"
-PORT="${VIMALINX_PORT:-8788}"
+PORT="${VIMALINX_PORT:-18788}"
 BIND_HOST="${VIMALINX_BIND_HOST:-0.0.0.0}"
 INBOUND_MODE="${VIMALINX_INBOUND_MODE:-poll}"
 ALLOW_REGISTRATION="${VIMALINX_ALLOW_REGISTRATION:-true}"

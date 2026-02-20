@@ -4,7 +4,7 @@ set -euo pipefail
 BUNDLE_PATH="${1:-$HOME/test-channel-bundle.tar.gz}"
 INSTALL_DIR="${TEST_INSTALL_DIR:-/opt/test}"
 USERS_FILE="${TEST_USERS_FILE:-/root/users.json}"
-PORT="${TEST_SERVER_PORT:-8788}"
+PORT="${TEST_SERVER_PORT:-18788}"
 INBOUND_MODE="${TEST_INBOUND_MODE:-poll}"
 LOG_PATH="${TEST_SERVER_LOG:-$INSTALL_DIR/server/server.log}"
 

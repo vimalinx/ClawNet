@@ -152,7 +152,7 @@ type MachineContributorPayload = {
 
 const __dirname = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const publicDir = resolve(__dirname, "public");
-const port = Number.parseInt(process.env.TEST_SERVER_PORT ?? "8788", 10);
+const port = Number.parseInt(process.env.TEST_SERVER_PORT ?? "18788", 10);
 const gatewayUrl = process.env.TEST_GATEWAY_URL?.trim();
 const gatewayToken = process.env.TEST_GATEWAY_TOKEN?.trim();
 const serverToken = process.env.TEST_SERVER_TOKEN?.trim();
@@ -2068,9 +2068,9 @@ const server = createServer(async (req, res) => {
   sendText(res, 404, "Not Found");
 });
 
-server.listen(Number.isFinite(port) ? port : 8788, bindHost, () => {
+server.listen(Number.isFinite(port) ? port : 18788, bindHost, () => {
   const usersCount = users.size;
-  const location = Number.isFinite(port) ? port : 8788;
+  const location = Number.isFinite(port) ? port : 18788;
   // eslint-disable-next-line no-console
   console.log(`Vimalinx Server listening on http://${bindHost}:${location}`);
   // eslint-disable-next-line no-console
