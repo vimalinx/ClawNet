@@ -24,6 +24,11 @@ data class TestServerSendPayload(
   val chatType: String,
   val senderName: String? = null,
   val id: String? = null,
+  val modeId: String? = null,
+  val modeLabel: String? = null,
+  val modelHint: String? = null,
+  val agentHint: String? = null,
+  val skillsHint: String? = null,
 )
 
 @Serializable
@@ -77,6 +82,14 @@ data class TestServerHealthResponse(
 
 @Serializable
 data class TestServerConfigResponse(
+  val ok: Boolean? = null,
+  val inviteRequired: Boolean? = null,
+  val allowRegistration: Boolean? = null,
+  val error: String? = null,
+)
+
+@Serializable
+data class TestServerPublicConfigResponse(
   val ok: Boolean? = null,
   val inviteRequired: Boolean? = null,
   val allowRegistration: Boolean? = null,
@@ -357,6 +370,7 @@ class TestServerClient(
     text: String,
     senderName: String?,
     messageId: String?,
+    mode: TestChatModeOption?,
   ): Response {
     val payload =
       TestServerSendPayload(
@@ -367,6 +381,11 @@ class TestServerClient(
         chatType = "dm",
         senderName = senderName,
         id = messageId,
+        modeId = mode?.id,
+        modeLabel = mode?.title,
+        modelHint = mode?.modelHint,
+        agentHint = mode?.agentHint,
+        skillsHint = mode?.skillsHint,
       )
     val body = json.encodeToString(TestServerSendPayload.serializer(), payload)
       .toRequestBody(jsonMediaType)

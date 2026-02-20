@@ -25,6 +25,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.sse.EventSource
@@ -32,9 +33,12 @@ import okhttp3.sse.EventSourceListener
 
 data class TestChatUiState(
   val account: TestChatAccount? = null,
+  val deviceId: String = "",
   val hosts: List<TestChatHost> = emptyList(),
   val tokenUsage: Map<String, TestChatTokenUsage> = emptyMap(),
   val sessionUsage: List<TestChatSessionUsage> = emptyList(),
+  val selectedModeId: String = TestChatModeCatalog.DEFAULT,
+  val modeOptions: List<TestChatModeOption> = TestChatModeCatalog.options,
   val isAuthenticated: Boolean = false,
   val connectionState: TestChatConnectionState = TestChatConnectionState.Disconnected,
   val errorText: String? = null,
@@ -85,6 +89,10 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
   private val _activeChatId = MutableStateFlow<String?>(null)
   private val _isInForeground = MutableStateFlow(true)
   private val _tokenUsage = MutableStateFlow<Map<String, TestChatTokenUsage>>(emptyMap())
+  private val _serverConfig =
+    MutableStateFlow(TestServerConfigState(serverUrl = _account.value?.serverUrl.orEmpty()))
+  private val _deviceId = MutableStateFlow(prefs.deviceId.value)
+  private val _selectedModeId = MutableStateFlow(prefs.selectedModeId.value)
   private val _inviteRequired = MutableStateFlow<Boolean?>(null)
   private val _serverTestMessage = MutableStateFlow<String?>(null)
   private val _serverTestSuccess = MutableStateFlow<Boolean?>(null)
@@ -130,12 +138,17 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
   val uiState: StateFlow<TestChatUiState> =
-    combine(uiStateExtras, _serverTestInProgress) { extras, serverTestInProgress ->
+    combine(uiStateExtras, _serverTestInProgress, _selectedModeId) {
+        extras,
+        serverTestInProgress,
+        selectedModeId,
+      ->
       val base = extras.base
       val (account, hosts, password) = base.auth
       val sortedThreads =
         base.snapshot.threads.sortedByDescending { thread -> thread.lastTimestampMs }
       val sessionUsage = buildSessionUsage(base.snapshot)
+      val normalizedModeId = TestChatModeCatalog.normalizeModeId(selectedModeId)
       val messages =
         if (base.activeChatId == null) {
           emptyList()
@@ -145,9 +158,12 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
       val isAuthenticated = account != null && !password.isNullOrBlank()
       TestChatUiState(
         account = account,
+        deviceId = _deviceId.value,
         hosts = hosts,
         tokenUsage = extras.tokenUsage,
         sessionUsage = sessionUsage,
+        selectedModeId = normalizedModeId,
+        modeOptions = TestChatModeCatalog.options,
         isAuthenticated = isAuthenticated,
         connectionState = base.connectionState,
         errorText = base.errorText,
@@ -196,19 +212,17 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val normalizedUser = userId.trim()
     val normalizedInvite = inviteCode.trim()
     val normalizedPassword = password.trim()
-    val inviteRequired = _inviteRequired.value == true
+    val inviteRequiredByConfig =
+      _serverConfig.value.serverUrl == normalizedServer && _serverConfig.value.inviteRequired == true
     if (
       normalizedUser.isBlank() ||
-        (inviteRequired && normalizedInvite.isBlank()) ||
+        (inviteRequiredByConfig && normalizedInvite.isBlank()) ||
         normalizedPassword.length < 6
     ) {
       _errorText.value = appString(R.string.error_register_required)
       return
     }
-    val config = _serverConfig.value
-    val inviteRequired =
-      config.serverUrl == normalizedServer && config.inviteRequired == true
-    if (inviteRequired && normalizedInvite.isBlank()) {
+    if (inviteRequiredByConfig && normalizedInvite.isBlank()) {
       _errorText.value = appString(R.string.error_register_invite_required)
       return
     }
@@ -234,17 +248,9 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
         return@launch
       }
       val account = TestChatAccount(serverUrl = normalizedServer, userId = userId)
-      prefs.saveAccount(account, normalizedPassword)
-      prefs.saveHosts(emptyList())
-      _account.value = account
-      _password.value = normalizedPassword
-      _hosts.value = emptyList()
-      _tokenUsage.value = emptyMap()
+      applyAuthenticatedAccount(account, normalizedPassword, resetHosts = true)
       _errorText.value = null
       onRegistered(userId)
-      loadAccount(account)
-      startStreams(account, _hosts.value)
-      refreshTokenUsage(account, normalizedPassword)
     }
   }
 
@@ -310,18 +316,80 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
         )
       if (!ok) return@launch
       val account = TestChatAccount(serverUrl = normalizedServer, userId = normalizedUser)
-      if (_account.value?.userId != account.userId) {
-        prefs.saveHosts(emptyList())
-        _hosts.value = emptyList()
-        _tokenUsage.value = emptyMap()
-      }
-      prefs.saveAccount(account, normalizedPassword)
-      _account.value = account
-      _password.value = normalizedPassword
+      applyAuthenticatedAccount(account, normalizedPassword, resetHosts = false)
       _errorText.value = null
-      loadAccount(account)
-      startStreams(account, _hosts.value)
-      refreshTokenUsage(account, normalizedPassword)
+    }
+  }
+
+  fun selectMode(modeId: String) {
+    val normalized = TestChatModeCatalog.normalizeModeId(modeId)
+    if (_selectedModeId.value == normalized) return
+    prefs.saveSelectedMode(normalized)
+    _selectedModeId.value = normalized
+  }
+
+  fun quickStartWithTestAccount(serverUrl: String) {
+    val normalizedServer = client.normalizeBaseUrl(serverUrl)
+    if (normalizedServer.isBlank()) {
+      _errorText.value = appString(R.string.error_server_url_required)
+      return
+    }
+    val quickUserId = buildQuickStartUserId(_deviceId.value)
+    _errorText.value = null
+    viewModelScope.launch {
+      val account = TestChatAccount(serverUrl = normalizedServer, userId = quickUserId)
+      val loginResponse =
+        runCatching {
+          client.loginAccount(normalizedServer, quickUserId, QUICK_START_PASSWORD)
+        }.getOrNull()
+      if (loginResponse?.ok == true && !loginResponse.userId.isNullOrBlank()) {
+        applyAuthenticatedAccount(account, QUICK_START_PASSWORD, resetHosts = true)
+        return@launch
+      }
+
+      val config = runCatching { client.fetchServerConfig(normalizedServer) }.getOrNull()
+      if (config?.ok == true && config.allowRegistration == false) {
+        _errorText.value = appString(R.string.error_quick_start_registration_closed)
+        return@launch
+      }
+      if (config?.ok == true && config.inviteRequired == true) {
+        _errorText.value = appString(R.string.error_quick_start_invite_required)
+        return@launch
+      }
+
+      val registerResponse =
+        runCatching {
+          client.registerAccount(normalizedServer, quickUserId, "", QUICK_START_PASSWORD)
+        }
+          .getOrElse {
+            _errorText.value = appString(R.string.error_quick_start_failed_detail, it.message ?: "")
+            return@launch
+          }
+
+      if (registerResponse.ok != true && registerResponse.error?.contains("user exists", ignoreCase = true) == true) {
+        _errorText.value = appString(R.string.error_quick_start_user_exists, quickUserId)
+        return@launch
+      }
+      if (registerResponse.ok != true) {
+        _errorText.value =
+          registerResponse.error ?: appString(R.string.error_quick_start_failed)
+        return@launch
+      }
+
+      val verifyLogin =
+        runCatching {
+          client.loginAccount(normalizedServer, quickUserId, QUICK_START_PASSWORD)
+        }
+          .getOrElse {
+            _errorText.value = appString(R.string.error_quick_start_failed_detail, it.message ?: "")
+            return@launch
+          }
+      if (verifyLogin.ok != true || verifyLogin.userId.isNullOrBlank()) {
+        _errorText.value = verifyLogin.error ?: appString(R.string.error_quick_start_failed)
+        return@launch
+      }
+
+      applyAuthenticatedAccount(account, QUICK_START_PASSWORD, resetHosts = true)
     }
   }
 
@@ -521,6 +589,25 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     _serverTestInProgress.value = false
   }
 
+  private suspend fun applyAuthenticatedAccount(
+    account: TestChatAccount,
+    password: String,
+    resetHosts: Boolean,
+  ) {
+    val shouldResetHosts = resetHosts || _account.value?.userId != account.userId
+    if (shouldResetHosts) {
+      prefs.saveHosts(emptyList())
+      _hosts.value = emptyList()
+      _tokenUsage.value = emptyMap()
+    }
+    prefs.saveAccount(account, password)
+    _account.value = account
+    _password.value = password
+    loadAccount(account)
+    startStreams(account, _hosts.value)
+    refreshTokenUsage(account, password)
+  }
+
   private suspend fun verifyAccountLogin(account: TestChatAccount, password: String): Boolean {
     val response =
       runCatching { client.loginAccount(account.serverUrl, account.userId, password) }
@@ -706,6 +793,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     val account = _account.value ?: return
     val chatId = _activeChatId.value ?: return
     if (text.isBlank()) return
+    val selectedMode = TestChatModeCatalog.resolveMode(_selectedModeId.value)
     val host = resolveHostForChat(chatId) ?: run {
       _errorText.value = appString(R.string.error_host_not_found)
       return
@@ -739,7 +827,14 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
         )
       val response =
         runCatching {
-          client.sendMessage(credentials, chatId, message.text, message.senderName, messageId)
+          client.sendMessage(
+            credentials,
+            chatId,
+            message.text,
+            message.senderName,
+            messageId,
+            selectedMode,
+          )
         }
           .getOrElse {
             _errorText.value = appString(R.string.error_send_failed_detail, it.message ?: "")
@@ -1160,6 +1255,15 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
     return trimmed.replace(Regex("[/|:]"), "-")
   }
 
+  private fun buildQuickStartUserId(deviceId: String): String {
+    val suffix =
+      deviceId.lowercase()
+        .filter { it.isLetterOrDigit() }
+        .takeLast(12)
+        .ifBlank { "guest" }
+    return "test_$suffix".take(32)
+  }
+
   override fun onCleared() {
     stopStreams()
     super.onCleared()
@@ -1303,6 +1407,7 @@ class TestChatViewModel(app: Application) : AndroidViewModel(app) {
 
   companion object {
     private const val MAX_MESSAGES = 2000
+    private const val QUICK_START_PASSWORD = "test123456"
     private const val DELIVERY_SENDING = "sending"
     private const val DELIVERY_SENT = "sent"
     private const val DELIVERY_ACK = "ack"

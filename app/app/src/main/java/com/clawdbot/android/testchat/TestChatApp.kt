@@ -13,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -107,8 +106,6 @@ import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.text.method.LinkMovementMethod
 import android.util.TypedValue
 import android.widget.TextView
@@ -127,7 +124,6 @@ fun TestChatApp(viewModel: TestChatViewModel) {
   val languageTag by viewModel.languageTag.collectAsState()
   val disclaimerAccepted by viewModel.disclaimerAccepted.collectAsState()
   val serverConfig by viewModel.serverConfig.collectAsState()
-  val serverTestMessage by viewModel.serverTestMessage.collectAsState()
   val context = LocalContext.current
   var registrationUserId by remember { mutableStateOf<String?>(null) }
   var currentTab by rememberSaveable { mutableStateOf(MainTab.Chat) }
@@ -145,6 +141,9 @@ fun TestChatApp(viewModel: TestChatViewModel) {
     if (!state.isAuthenticated) {
       AccountScreen(
         errorText = state.errorText,
+        deviceId = state.deviceId,
+        selectedModeId = state.selectedModeId,
+        modeOptions = state.modeOptions,
         inviteRequired = state.inviteRequired,
         serverTestMessage = state.serverTestMessage,
         serverTestSuccess = state.serverTestSuccess,
@@ -152,8 +151,8 @@ fun TestChatApp(viewModel: TestChatViewModel) {
         initialUserId = state.account?.userId,
         initialServerUrl = state.account?.serverUrl,
         serverConfig = serverConfig,
-        onRefreshServerConfig = viewModel::refreshServerConfig,
-        onClearServerTest = viewModel::clearServerTestMessage,
+        onSelectMode = viewModel::selectMode,
+        onQuickStart = viewModel::quickStartWithTestAccount,
         onRegister = { serverUrl, userId, inviteCode, password ->
           viewModel.registerAccount(serverUrl, userId, inviteCode, password) { registeredId ->
             registrationUserId = registeredId
@@ -162,13 +161,16 @@ fun TestChatApp(viewModel: TestChatViewModel) {
         onLogin = viewModel::loginAccount,
         onTestServer = viewModel::testServerConnection,
         onClearServerTest = viewModel::clearServerTestStatus,
-        onFetchServerConfig = viewModel::fetchServerConfig,
+        onFetchServerConfig = viewModel::refreshServerConfig,
       )
     } else if (state.activeChatId != null) {
       ChatScreen(
         state = state,
         onBack = viewModel::backToList,
         onSend = viewModel::sendMessage,
+        selectedModeId = state.selectedModeId,
+        modeOptions = state.modeOptions,
+        onSelectMode = viewModel::selectMode,
       )
     } else {
       Scaffold(
@@ -201,6 +203,9 @@ fun TestChatApp(viewModel: TestChatViewModel) {
                 onDeleteThread = viewModel::deleteThread,
                 onRestoreThread = viewModel::restoreThread,
                 onPurgeThread = viewModel::purgeThread,
+                selectedModeId = state.selectedModeId,
+                modeOptions = state.modeOptions,
+                onSelectMode = viewModel::selectMode,
               )
             }
           }
@@ -257,6 +262,9 @@ private enum class MainTab {
 @Composable
 private fun AccountScreen(
   errorText: String?,
+  deviceId: String,
+  selectedModeId: String,
+  modeOptions: List<TestChatModeOption>,
   inviteRequired: Boolean?,
   serverTestMessage: String?,
   serverTestSuccess: Boolean?,
@@ -264,18 +272,18 @@ private fun AccountScreen(
   initialUserId: String?,
   initialServerUrl: String?,
   serverConfig: TestServerConfigState,
-  onRefreshServerConfig: (String) -> Unit,
+  onSelectMode: (String) -> Unit,
+  onQuickStart: (serverUrl: String) -> Unit,
   onClearServerTest: () -> Unit,
   onRegister: (serverUrl: String, userId: String, inviteCode: String, password: String) -> Unit,
   onLogin: (serverUrl: String, userId: String, password: String) -> Unit,
   onTestServer: (serverUrl: String) -> Unit,
-  onClearServerTest: () -> Unit,
   onFetchServerConfig: (serverUrl: String) -> Unit,
 ) {
   val vimalinxServerLabel = stringResource(R.string.label_vimalinx_server)
   val serverOptions = remember(vimalinxServerLabel) {
     mutableStateListOf(
-      ServerOption(label = "Direct", url = DEFAULT_SERVER_URL),
+      ServerOption(label = vimalinxServerLabel, url = DEFAULT_SERVER_URL),
     )
   }
   val startingServer = initialServerUrl?.trim().orEmpty()
@@ -295,15 +303,7 @@ private fun AccountScreen(
   val unknownServerLabel = stringResource(R.string.label_unknown_server)
   val normalizedSelectedServer = normalizeServerUrl(selectedServer)
   val configMatchesServer = serverConfig.serverUrl == normalizedSelectedServer
-  val inviteRequirement = if (configMatchesServer) serverConfig.inviteRequired else null
-  val allowRegistration = if (configMatchesServer) serverConfig.allowRegistration != false else true
-  val inviteLabelRes =
-    if (inviteRequirement == null) {
-      R.string.label_invite_code_optional
-    } else {
-      R.string.label_invite_code
-    }
-
+  val inviteRequirement = if (configMatchesServer) serverConfig.inviteRequired else inviteRequired
   LaunchedEffect(selectedServer) {
     onClearServerTest()
     onFetchServerConfig(selectedServer)
@@ -368,9 +368,7 @@ private fun AccountScreen(
           if (!errorText.isNullOrBlank()) {
             ErrorCard(text = errorText)
           }
-          if (!serverTestMessage.isNullOrBlank()) {
-            InfoCard(text = serverTestMessage)
-          }
+          InfoCard(text = stringResource(R.string.info_quick_start_device, deviceId))
           ServerPicker(
             servers = serverOptions,
             selectedUrl = selectedServer,
@@ -393,6 +391,13 @@ private fun AccountScreen(
               ErrorCard(text = serverTestMessage)
             }
           }
+          ModeSelectorRow(
+            title = stringResource(R.string.title_model_mode),
+            options = modeOptions,
+            selectedModeId = selectedModeId,
+            onSelectMode = onSelectMode,
+          )
+          ModeHintCard(mode = TestChatModeCatalog.resolveMode(selectedModeId))
           OutlinedButton(
             onClick = { onTestServer(selectedServer) },
             enabled = selectedServer.isNotBlank() && !serverTestInProgress,
@@ -406,10 +411,12 @@ private fun AccountScreen(
               },
             )
           }
-          Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = { onTestServer(selectedServer) }) {
-              Text(stringResource(R.string.action_test_connection))
-            }
+          Button(
+            onClick = { onQuickStart(selectedServer) },
+            enabled = selectedServer.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(stringResource(R.string.action_quick_start))
           }
           Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = { isLogin = false }) {
@@ -450,24 +457,24 @@ private fun AccountScreen(
               singleLine = true,
               colors = textFieldColors(),
             )
-          val inviteIsRequired = inviteRequired == true
-          TextField(
-            value = inviteCode,
-            onValueChange = { inviteCode = it },
-            label = {
-              Text(
-                stringResource(
-                  if (inviteIsRequired) {
-                    R.string.label_invite_code
-                  } else {
-                    R.string.label_invite_code_optional
-                  },
-                ),
-              )
-            },
-            singleLine = true,
-            colors = textFieldColors(),
-          )
+            val inviteIsRequired = inviteRequirement == true
+            TextField(
+              value = inviteCode,
+              onValueChange = { inviteCode = it },
+              label = {
+                Text(
+                  stringResource(
+                    if (inviteIsRequired) {
+                      R.string.label_invite_code
+                    } else {
+                      R.string.label_invite_code_optional
+                    },
+                  ),
+                )
+              },
+              singleLine = true,
+              colors = textFieldColors(),
+            )
             TextField(
               value = registerPassword,
               onValueChange = { registerPassword = it },
@@ -555,6 +562,9 @@ private fun ChatListScreen(
   onDeleteThread: (String) -> Unit,
   onRestoreThread: (String) -> Unit,
   onPurgeThread: (String) -> Unit,
+  selectedModeId: String,
+  modeOptions: List<TestChatModeOption>,
+  onSelectMode: (String) -> Unit,
 ) {
   var showNewChat by remember { mutableStateOf(false) }
   var newChatTitle by rememberSaveable { mutableStateOf("") }
@@ -633,6 +643,13 @@ private fun ChatListScreen(
       } else {
           HostListRow(hosts = state.hosts, sessionUsage = state.sessionUsage)
       }
+      ModeSelectorRow(
+        title = stringResource(R.string.title_model_mode),
+        options = modeOptions,
+        selectedModeId = selectedModeId,
+        onSelectMode = onSelectMode,
+      )
+      ModeHintCard(mode = TestChatModeCatalog.resolveMode(selectedModeId))
       if (state.threads.isNotEmpty()) {
         TextField(
           value = searchQuery,
@@ -987,6 +1004,9 @@ private fun ChatScreen(
   state: TestChatUiState,
   onBack: () -> Unit,
   onSend: (String) -> Unit,
+  selectedModeId: String,
+  modeOptions: List<TestChatModeOption>,
+  onSelectMode: (String) -> Unit,
 ) {
   val chatId = state.activeChatId ?: return
   val thread = state.threads.firstOrNull { it.chatId == chatId }
@@ -1028,6 +1048,9 @@ private fun ChatScreen(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
               MachineBadge(label = machineLabel, color = machineColor)
+              Spacer(modifier = Modifier.width(8.dp))
+              val mode = TestChatModeCatalog.resolveMode(selectedModeId)
+              MachineBadge(label = mode.title, color = MaterialTheme.colorScheme.primary)
             }
             ConnectionStatusRow(state)
           }
@@ -1063,6 +1086,13 @@ private fun ChatScreen(
       ) {
         ErrorCard(text = state.errorText ?: "")
       }
+      ModeSelectorRow(
+        title = stringResource(R.string.title_model_mode),
+        options = modeOptions,
+        selectedModeId = selectedModeId,
+        onSelectMode = onSelectMode,
+      )
+      ModeHintCard(mode = TestChatModeCatalog.resolveMode(selectedModeId))
       LazyColumn(
         state = listState,
         modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
@@ -1736,6 +1766,52 @@ private fun HostPicker(
 }
 
 @Composable
+private fun ModeSelectorRow(
+  title: String,
+  options: List<TestChatModeOption>,
+  selectedModeId: String,
+  onSelectMode: (String) -> Unit,
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(
+      text = title,
+      style = MaterialTheme.typography.labelMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(
+      modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      options.forEach { option ->
+        val isSelected = option.id == selectedModeId
+        if (isSelected) {
+          Button(onClick = { onSelectMode(option.id) }) {
+            Text(option.title)
+          }
+        } else {
+          OutlinedButton(onClick = { onSelectMode(option.id) }) {
+            Text(option.title)
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun ModeHintCard(mode: TestChatModeOption) {
+  InfoCard(
+    text =
+      stringResource(
+        R.string.info_mode_hint,
+        mode.modelHint,
+        mode.agentHint,
+        mode.skillsHint,
+      ),
+  )
+}
+
+@Composable
 private fun LanguagePicker(
   selectedTag: String,
   onSelected: (String) -> Unit,
@@ -2255,4 +2331,4 @@ private val machinePalette =
   )
 
 private const val UUID_PREFIX = "local"
-private const val DEFAULT_SERVER_URL = "https://vimagram.vimalinx.xyz"
+private const val DEFAULT_SERVER_URL = "http://49.235.88.239:8788"
