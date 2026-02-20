@@ -2331,4 +2331,4 @@ private val machinePalette =
   )
 
 private const val UUID_PREFIX = "local"
-private const val DEFAULT_SERVER_URL = "http://49.235.88.239:8788"
+private const val DEFAULT_SERVER_URL = "http://49.235.88.239:18788"

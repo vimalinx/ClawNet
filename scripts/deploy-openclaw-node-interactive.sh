@@ -8,8 +8,11 @@ Interactive installer for an OpenClaw client node.
 Usage:
   bash scripts/deploy-openclaw-node-interactive.sh
 
-This wizard collects options and then runs:
-  scripts/deploy-openclaw-node.sh
+Default flow is token-first quick setup:
+  1) Input contributor token
+  2) Auto connect to server and apply config
+
+Advanced options are optional.
 EOF
 }
 
@@ -89,15 +92,27 @@ echo
 echo "== OpenClaw Client Node Interactive Installer =="
 echo
 
-SERVER_URL="$(ask_with_default "Server URL" "${DEFAULT_SERVER_URL}")"
 CONTRIBUTOR_TOKEN="$(ask_secret_required "Contributor token")"
-TARGET_USER="$(ask_with_default "Target Linux user" "${DEFAULT_TARGET_USER}")"
-REPO_URL="$(ask_with_default "Repository URL" "${DEFAULT_REPO_URL}")"
-REPO_DIR="$(ask_optional "Repository directory (optional)")"
-INBOUND_MODE="$(ask_with_default "Inbound mode (poll/webhook)" "${DEFAULT_INBOUND_MODE}")"
-MACHINE_ID="$(ask_optional "Machine ID (optional)")"
-MACHINE_LABEL="$(ask_optional "Machine label (optional)")"
-INSTALL_OPENCLAW="$(ask_yes_no "Install OpenClaw CLI if missing" "Y")"
+SERVER_URL="${DEFAULT_SERVER_URL}"
+TARGET_USER="${DEFAULT_TARGET_USER}"
+REPO_URL="${DEFAULT_REPO_URL}"
+REPO_DIR=""
+INBOUND_MODE="${DEFAULT_INBOUND_MODE}"
+MACHINE_ID=""
+MACHINE_LABEL=""
+INSTALL_OPENCLAW="true"
+
+ADVANCED="$(ask_yes_no "Configure advanced options" "N")"
+if [[ "${ADVANCED}" == "true" ]]; then
+  SERVER_URL="$(ask_with_default "Server URL" "${SERVER_URL}")"
+  TARGET_USER="$(ask_with_default "Target Linux user" "${TARGET_USER}")"
+  REPO_URL="$(ask_with_default "Repository URL" "${REPO_URL}")"
+  REPO_DIR="$(ask_optional "Repository directory (optional)")"
+  INBOUND_MODE="$(ask_with_default "Inbound mode (poll/webhook)" "${INBOUND_MODE}")"
+  MACHINE_ID="$(ask_optional "Machine ID (optional)")"
+  MACHINE_LABEL="$(ask_optional "Machine label (optional)")"
+  INSTALL_OPENCLAW="$(ask_yes_no "Install OpenClaw CLI if missing" "Y")"
+fi
 
 echo
 echo "Install summary"
