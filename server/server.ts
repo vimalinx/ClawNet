@@ -144,6 +144,7 @@ type MachinePatchPayload = {
 
 type MachineContributorPayload = {
   userId?: string;
+  password?: string;
   machineId?: string;
   machineLabel?: string;
   accountId?: string;
@@ -1495,6 +1496,11 @@ const server = createServer(async (req, res) => {
     }
 
     const requestedUserId = normalizeUserId(payload.userId ?? undefined);
+    const contributorPassword = normalizePassword(payload.password ?? undefined);
+    if (!contributorPassword) {
+      sendJson(res, 400, { error: "password required" });
+      return;
+    }
     const userId = requestedUserId ?? generateContributorUserId();
     if (users.has(userId)) {
       sendJson(res, 409, { error: "user exists" });
@@ -1521,6 +1527,7 @@ const server = createServer(async (req, res) => {
     const contributor: UserRecord = {
       id: userId,
       displayName,
+      passwordHash: hashPassword(contributorPassword),
     };
 
     let token = generateToken();

@@ -195,6 +195,18 @@
         <div class="status" id="status">准备就绪。</div>
       </section>
 
+      <section class="card">
+        <h3 style="margin: 0 0 8px;">上传者登录并获取 Token（网页 GUI）</h3>
+        <p class="small">上传者可在此用 userId + password 登录并一键生成 host token，再用于本地节点接入。</p>
+        <div class="deploy-grid" style="grid-template-columns: 1fr 1fr auto auto;">
+          <input id="uploaderUserId" placeholder="userId" />
+          <input id="uploaderPassword" type="password" placeholder="password" />
+          <button id="uploaderLogin">登录验证</button>
+          <button id="uploaderGenToken">生成 Token</button>
+        </div>
+        <pre id="uploaderTokenInfo">先输入 userId + password，再点击“生成 Token”。</pre>
+      </section>
+
       <section class="split">
         <div class="card">
           <h3 style="margin: 0 0 8px;">机器列表</h3>
@@ -274,6 +286,7 @@
           <input id="deployServer" placeholder="Server URL" />
           <input id="contributorMachineLabel" placeholder="机器显示名（可选）" />
           <input id="contributorMachineId" placeholder="machineId（可选）" />
+          <input id="contributorPassword" type="password" placeholder="贡献者密码（必填）" />
           <input id="contributorAccountId" placeholder="accountId（默认 default）" />
           <button id="createContributor">注册贡献者</button>
         </div>
@@ -309,8 +322,14 @@
       const reloadSelectedBtn = document.getElementById("reloadSelected");
 
       const deployServerEl = document.getElementById("deployServer");
+      const uploaderUserIdEl = document.getElementById("uploaderUserId");
+      const uploaderPasswordEl = document.getElementById("uploaderPassword");
+      const uploaderTokenInfoEl = document.getElementById("uploaderTokenInfo");
+      const uploaderLoginBtn = document.getElementById("uploaderLogin");
+      const uploaderGenTokenBtn = document.getElementById("uploaderGenToken");
       const contributorMachineLabelEl = document.getElementById("contributorMachineLabel");
       const contributorMachineIdEl = document.getElementById("contributorMachineId");
+      const contributorPasswordEl = document.getElementById("contributorPassword");
       const contributorAccountIdEl = document.getElementById("contributorAccountId");
       const contributorInfoEl = document.getElementById("contributorInfo");
       const createContributorBtn = document.getElementById("createContributor");
@@ -318,6 +337,7 @@
       const copyCommandBtn = document.getElementById("copyCommand");
 
       let currentContributor = null;
+      let currentUploaderToken = "";
 
       function modeInput(mode, field) {
         return document.getElementById(`${mode}${field}`);
@@ -540,22 +560,24 @@
       function buildDeployCommand() {
         const baseUrl = cleanBaseUrl(deployServerEl.value || baseUrlEl.value);
         deployServerEl.value = baseUrl;
-        if (!currentContributor?.token) {
-          deployCommandEl.textContent = "先注册贡献者后会自动生成命令。";
+        const selectedToken = currentContributor?.token || currentUploaderToken;
+        const selectedUserId = currentContributor?.userId || uploaderUserIdEl.value.trim();
+        if (!selectedToken) {
+          deployCommandEl.textContent = "先注册贡献者或在上方生成上传者 Token。";
           return;
         }
         const parts = [
-          "git clone https://github.com/vimalinx/vimalinx-suite-core",
-          "cd vimalinx-suite-core",
-          `bash scripts/deploy-openclaw-node.sh --server-url ${JSON.stringify(baseUrl)} --token ${JSON.stringify(currentContributor.token)}`,
+          "git clone https://github.com/vimalinx/ClawNet.git",
+          "cd ClawNet",
+          `bash scripts/deploy-openclaw-node.sh --server-url ${JSON.stringify(baseUrl)} --token ${JSON.stringify(selectedToken)}`,
         ];
-        if (currentContributor.userId) {
-          parts[2] += ` --user-id ${JSON.stringify(currentContributor.userId)}`;
+        if (selectedUserId) {
+          parts[2] += ` --user-id ${JSON.stringify(selectedUserId)}`;
         }
-        if (currentContributor.machineId) {
+        if (currentContributor?.machineId) {
           parts[2] += ` --machine-id ${JSON.stringify(currentContributor.machineId)}`;
         }
-        if (currentContributor.machineLabel) {
+        if (currentContributor?.machineLabel) {
           parts[2] += ` --machine-label ${JSON.stringify(currentContributor.machineLabel)}`;
         }
         deployCommandEl.textContent = parts.join(" && ");
@@ -567,9 +589,15 @@
         const payload = {};
         const machineLabel = contributorMachineLabelEl.value.trim();
         const machineId = contributorMachineIdEl.value.trim();
+        const password = contributorPasswordEl.value;
         const accountId = contributorAccountIdEl.value.trim();
+        if (!password || password.trim().length < 6) {
+          setStatus("贡献者密码必填，且长度至少 6 位。");
+          return;
+        }
         if (machineLabel) payload.machineLabel = machineLabel;
         if (machineId) payload.machineId = machineId;
+        payload.password = password;
         if (accountId) payload.accountId = accountId;
 
         setStatus("注册贡献者中...");
@@ -588,6 +616,7 @@
             machineId: contributor.machineId || machine.machineId || "",
             machineLabel: machine.machineLabel || machineLabel || "",
           };
+          contributorPasswordEl.value = "";
           contributorInfoEl.textContent = `userId: ${currentContributor.userId || "-"}\n` +
             `token: ${currentContributor.token || "-"}\n` +
             `machineId: ${currentContributor.machineId || "-"}\n` +
@@ -603,6 +632,59 @@
           setStatus(`注册失败：${error.message}`);
         } finally {
           createContributorBtn.disabled = false;
+        }
+      }
+
+      async function uploaderLogin() {
+        const baseUrl = cleanBaseUrl(baseUrlEl.value);
+        const userId = uploaderUserIdEl.value.trim();
+        const password = uploaderPasswordEl.value;
+        if (!userId || !password) {
+          setStatus("请先输入上传者 userId 和 password。");
+          return;
+        }
+        uploaderLoginBtn.disabled = true;
+        try {
+          const data = await requestJson(`${baseUrl}/api/account/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, password }),
+          });
+          uploaderTokenInfoEl.textContent = `登录成功\nuserId: ${data.userId || userId}\ndisplayName: ${data.displayName || "-"}`;
+          setStatus("上传者登录验证成功。");
+        } catch (error) {
+          setStatus(`上传者登录失败：${error.message}`);
+        } finally {
+          uploaderLoginBtn.disabled = false;
+        }
+      }
+
+      async function uploaderGenerateToken() {
+        const baseUrl = cleanBaseUrl(baseUrlEl.value);
+        const userId = uploaderUserIdEl.value.trim();
+        const password = uploaderPasswordEl.value;
+        if (!userId || !password) {
+          setStatus("请先输入上传者 userId 和 password。");
+          return;
+        }
+        uploaderGenTokenBtn.disabled = true;
+        try {
+          const data = await requestJson(`${baseUrl}/api/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, password }),
+          });
+          currentUploaderToken = data.token || "";
+          uploaderTokenInfoEl.textContent = `Token 生成成功\nuserId: ${data.userId || userId}\ntoken: ${currentUploaderToken || "-"}`;
+          authTokenEl.value = currentUploaderToken || authTokenEl.value;
+          userIdEl.value = data.userId || userId;
+          localStorage.setItem("test_user_id", userIdEl.value.trim());
+          localStorage.setItem("test_user_token", authTokenEl.value.trim());
+          setStatus("上传者 Token 已生成，可直接用于机器接入。");
+        } catch (error) {
+          setStatus(`生成 Token 失败：${error.message}`);
+        } finally {
+          uploaderGenTokenBtn.disabled = false;
         }
       }
 
@@ -627,6 +709,8 @@
       saveConfigBtn.addEventListener("click", saveSelectedMachine);
       reloadSelectedBtn.addEventListener("click", reloadSelectedMachine);
       createContributorBtn.addEventListener("click", createContributor);
+      uploaderLoginBtn.addEventListener("click", uploaderLogin);
+      uploaderGenTokenBtn.addEventListener("click", uploaderGenerateToken);
       deployServerEl.addEventListener("change", buildDeployCommand);
       copyCommandBtn.addEventListener("click", copyDeployCommand);
 
@@ -636,6 +720,7 @@
       const savedToken = localStorage.getItem("test_user_token") || "";
       if (savedUserId) {
         userIdEl.value = savedUserId;
+        uploaderUserIdEl.value = savedUserId;
       }
       if (savedToken) {
         authTokenEl.value = savedToken;
