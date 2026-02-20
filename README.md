@@ -48,14 +48,14 @@ openclaw onboard
 #### 步骤 3：克隆仓库
 
 ```bash
-git clone https://github.com/vimalinx/vimalinx-suite-core
-cd vimalinx-suite-core
+git clone https://github.com/vimalinx/ClawNet.git
+cd ClawNet
 ```
 
 #### 步骤 4：在手机上注册并获取 Token
 
 1. 安装 Vimagram App（见下方"Android App 安装"）
-2. 启动 Vimagram，默认是`http://123.60.21.129:8788`，如果有第三方服务器点击“添加服务器”
+2. 启动 Vimagram，默认是`http://49.235.88.239:18788`，如果有第三方服务器点击“添加服务器”
 3. 点击 **注册**，填写用户信息
 4. 注册成功后，在 **Account** 页面生成 **主机 Token**
 5. 复制生成的 Token
@@ -75,7 +75,7 @@ cd vimalinx-suite-core
 1. **检查依赖**：验证 `openclaw`、`curl`、`python3` 是否已安装
 2. **复制插件**：将 `plugin` 目录复制到 `~/.openclaw/extensions/vimalinx`
 3. **配置服务器**：
-   - 提示输入 **Vimalinx Server URL**（直接回车使用默认服务器 `http://123.60.21.129:8788`）
+   - 提示输入 **Vimalinx Server URL**（直接回车使用默认服务器 `http://49.235.88.239:18788`）
    - 提示输入 **Token**（粘贴从手机 App 复制的 Token）
 4. **登录验证**：使用 Token 登录服务器，获取 `userId` 和 `token`
 5. **写入配置**：自动更新 `~/.openclaw/openclaw.json`，配置 Vimalinx channel
@@ -119,7 +119,7 @@ VIMALINX_FORCE_OVERWRITE=1 ./install.sh
 
 ```bash
 # 指定服务器 URL
-export VIMALINX_SERVER_URL="http://your-server:8788"
+export VIMALINX_SERVER_URL="http://your-server:18788"
 
 # 指定 Token
 export VIMALINX_TOKEN="your-token-here"
@@ -140,7 +140,7 @@ export VIMALINX_INBOUND_MODE="poll"
   "channels": {
     "vimalinx": {
       "enabled": true,
-      "baseUrl": "http://123.60.21.129:8788",
+      "baseUrl": "http://49.235.88.239:18788",
       "userId": "your-user-id",
       "token": "your-token",
       "inboundMode": "poll",
@@ -192,7 +192,7 @@ cd app
 
 1. **启动 App**：打开 Vimagram
 2. **配置服务器**：
-   - 输入服务器地址（例如：`http://123.60.21.129:8788`）
+   - 输入服务器地址（例如：`http://49.235.88.239:18788`）
    - ~~ 如果使用 HTTPS，请确保服务器证书有效 ~~ 暂未支持
 3. **注册账号**：
    - 填写用户名、密码
@@ -247,7 +247,7 @@ sudo bash scripts/deploy-server-interactive.sh
 ```bash
 git clone https://github.com/vimalinx/ClawNet.git
 cd ClawNet
-bash scripts/deploy-openclaw-node.sh --server-url http://49.235.88.239:8788 --token <机器贡献者token>
+bash scripts/deploy-openclaw-node.sh --server-url http://49.235.88.239:18788 --token <机器贡献者token>
 ```
 
 如果你希望交互式填写参数，改用：
@@ -259,7 +259,7 @@ bash scripts/deploy-openclaw-node-interactive.sh
 机器贡献者 token 由服务器 GUI 生成：
 
 ```text
-http://49.235.88.239:8788/admin
+http://49.235.88.239:18788/admin
 ```
 
 在 GUI 点击“机器贡献者注册（无密码）”即可生成 token 和一键命令。
@@ -267,7 +267,7 @@ http://49.235.88.239:8788/admin
 机器池图形管理页：
 
 ```text
-http://49.235.88.239:8788/admin
+http://49.235.88.239:18788/admin
 ```
 
 如果你确实希望在服务器机器上也执行 OpenClaw 集成（不推荐默认），可显式启用：
@@ -282,7 +282,7 @@ sudo bash scripts/deploy-server-oneclick.sh --with-openclaw \
 ### 快速启动（本地测试）
 
 ```bash
-export TEST_SERVER_PORT=8788
+export TEST_SERVER_PORT=18788
 export TEST_USERS_FILE=/path/to/vimalinx-users.json
 export TEST_ALLOW_REGISTRATION=true
 

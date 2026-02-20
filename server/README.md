@@ -58,7 +58,7 @@ sudo bash scripts/deploy-server-interactive.sh
 ```bash
 git clone https://github.com/vimalinx/ClawNet.git
 cd ClawNet
-bash scripts/deploy-openclaw-node.sh --server-url http://49.235.88.239:8788 --token <机器贡献者token>
+bash scripts/deploy-openclaw-node.sh --server-url http://49.235.88.239:18788 --token <机器贡献者token>
 ```
 
 如果你希望交互式填写参数，改用：
@@ -70,7 +70,7 @@ bash scripts/deploy-openclaw-node-interactive.sh
 部署后可在机器池控制台查看在线节点并配置模式路由：
 
 ```text
-http://49.235.88.239:8788/admin
+http://49.235.88.239:18788/admin
 ```
 
 在控制台点击“机器贡献者注册（无密码）”会自动创建贡献者账号并返回 token。
@@ -87,17 +87,17 @@ sudo VIMALINX_MODE_ACCOUNT_MAP="quick=default,code=code,deep=deep" bash scripts/
 ### 本地开发模式（Poll 模式）
 
 ```bash
-export TEST_SERVER_PORT=8788
+export TEST_SERVER_PORT=18788
 export TEST_USERS_FILE=/path/to/vimalinx-users.json
 export TEST_ALLOW_REGISTRATION=true
 
 node server/server.mjs
 ```
 
-启动后，访问 `http://localhost:8788` 可以查看 Web UI。
+启动后，访问 `http://localhost:18788` 可以查看 Web UI。
 
 **说明：**
-- `TEST_SERVER_PORT`：服务器监听端口（默认 `8788`）
+- `TEST_SERVER_PORT`：服务器监听端口（默认 `18788`）
 - `TEST_USERS_FILE`：用户数据持久化文件路径
 - `TEST_ALLOW_REGISTRATION`：是否允许开放注册（`true`/`false`）
 
@@ -109,7 +109,7 @@ node server/server.mjs
 
 | 环境变量 | 类型 | 默认值 | 说明 |
 |---------|------|--------|------|
-| `TEST_SERVER_PORT` | number | `8788` | 服务器监听端口 |
+| `TEST_SERVER_PORT` | number | `18788` | 服务器监听端口 |
 | `TEST_SERVER_TOKEN` | string | - | 全局 `/send` 端点密钥（可选） |
 | `TEST_GATEWAY_URL` | string | - | Gateway webhook URL（webhook 模式） |
 | `TEST_GATEWAY_TOKEN` | string | - | Gateway 认证 Token |
@@ -376,7 +376,7 @@ export TEST_SIGNATURE_TTL_MS=600000  # 10 分钟
 ### 用户注册
 
 ```bash
-curl -X POST http://localhost:8788/api/register \
+curl -X POST http://localhost:18788/api/register \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "alice",
@@ -398,7 +398,7 @@ curl -X POST http://localhost:8788/api/register \
 ### 账号密码登录
 
 ```bash
-curl -X POST http://localhost:8788/api/account/login \
+curl -X POST http://localhost:18788/api/account/login \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "alice",
@@ -419,7 +419,7 @@ curl -X POST http://localhost:8788/api/account/login \
 ### 生成主机 Token
 
 ```bash
-curl -X POST http://localhost:8788/api/token \
+curl -X POST http://localhost:18788/api/token \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "alice",
@@ -440,7 +440,7 @@ curl -X POST http://localhost:8788/api/token \
 ### Token 登录
 
 ```bash
-curl -X POST http://localhost:8788/api/login \
+curl -X POST http://localhost:18788/api/login \
   -H "Content-Type: application/json" \
   -d '{
     "token": "host-abc123def456"
@@ -461,7 +461,7 @@ curl -X POST http://localhost:8788/api/login \
 ### 发送消息（客户端 -> 服务器）
 
 ```bash
-curl -X POST http://localhost:8788/api/message \
+curl -X POST http://localhost:18788/api/message \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "alice",
@@ -482,7 +482,7 @@ curl -X POST http://localhost:8788/api/message \
 ### Poll 获取消息（服务器 -> Gateway）
 
 ```bash
-curl -X GET "http://localhost:8788/api/poll?userId=alice&token=host-abc123def456&timeout=30000"
+curl -X GET "http://localhost:18788/api/poll?userId=alice&token=host-abc123def456&timeout=30000"
 ```
 
 **响应示例：**
@@ -506,7 +506,7 @@ curl -X GET "http://localhost:8788/api/poll?userId=alice&token=host-abc123def456
 ### 出站消息（Gateway -> 服务器）
 
 ```bash
-curl -X POST http://localhost:8788/send \
+curl -X POST http://localhost:18788/send \
   -H "Content-Type: application/json" \
   -d '{
     "serverToken": "your-global-secret-token",
@@ -570,7 +570,7 @@ After=network.target
 Type=simple
 User=vimalinx
 WorkingDirectory=/path/to/vimalinx-suite-core
-Environment="TEST_SERVER_PORT=8788"
+Environment="TEST_SERVER_PORT=18788"
 Environment="TEST_USERS_FILE=/var/lib/vimalinx/users.json"
 Environment="TEST_ALLOW_REGISTRATION=true"
 ExecStart=/usr/bin/node server/server.mjs
@@ -622,13 +622,13 @@ RUN npm ci --only=production
 
 COPY server ./server
 
-ENV TEST_SERVER_PORT=8788
+ENV TEST_SERVER_PORT=18788
 ENV TEST_USERS_FILE=/data/users.json
 ENV TEST_ALLOW_REGISTRATION=true
 
 VOLUME /data
 
-EXPOSE 8788
+EXPOSE 18788
 
 CMD ["node", "server/server.mjs"]
 ```
@@ -642,9 +642,9 @@ docker build -t vimalinx-server .
 # 运行容器
 docker run -d \
   --name vimalinx-server \
-  -p 8788:8788 \
+-p 18788:18788 \
   -v /path/to/data:/data \
-  -e TEST_SERVER_PORT=8788 \
+-e TEST_SERVER_PORT=18788 \
   -e TEST_USERS_FILE=/data/users.json \
   -e TEST_ALLOW_REGISTRATION=true \
   --restart unless-stopped \
@@ -661,11 +661,11 @@ services:
     build: .
     container_name: vimalinx-server
     ports:
-      - "8788:8788"
+- "18788:18788"
     volumes:
       - ./data:/data
     environment:
-      - TEST_SERVER_PORT=8788
+- TEST_SERVER_PORT=18788
       - TEST_USERS_FILE=/data/users.json
       - TEST_ALLOW_REGISTRATION=true
       - TEST_HMAC_SECRET=${HMAC_SECRET}
@@ -703,7 +703,7 @@ docker-compose up -d
    - 考虑实现密码重置功能（需要自行扩展）
 
 5. **防火墙配置**
-   - 仅开放必要的端口（8788）
+- 仅开放必要的端口（18788）
    - 使用防火墙限制访问 IP
 
 6. **定期备份**
@@ -728,8 +728,8 @@ docker-compose up -d
 1. **端口被占用**
    ```bash
    # 检查端口占用
-   lsof -i :8788  # macOS/Linux
-   netstat -ano | findstr :8788  # Windows
+lsof -i :18788  # macOS/Linux
+netstat -ano | findstr :18788  # Windows
 
    # 更换端口
    export TEST_SERVER_PORT=8789
@@ -762,16 +762,16 @@ docker-compose up -d
 
 1. **检查服务器是否运行**
    ```bash
-   curl http://localhost:8788/
+curl http://localhost:18788/
    ```
 
 2. **检查防火墙设置**
    ```bash
    # Linux (ufw)
-   sudo ufw allow 8788/tcp
+sudo ufw allow 18788/tcp
 
    # Linux (firewalld)
-   sudo firewall-cmd --permanent --add-port=8788/tcp
+sudo firewall-cmd --permanent --add-port=18788/tcp
    sudo firewall-cmd --reload
    ```
 
@@ -787,7 +787,7 @@ docker-compose up -d
 
 1. **检查 Token 是否有效**
    ```bash
-   curl -X POST http://localhost:8788/api/login \
+curl -X POST http://localhost:18788/api/login \
      -H "Content-Type: application/json" \
      -d '{"token":"your-token"}'
    ```
