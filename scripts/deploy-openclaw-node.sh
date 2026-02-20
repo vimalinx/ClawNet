@@ -113,7 +113,7 @@ PY
 }
 
 SERVER_URL="${VIMALINX_SERVER_URL:-}"
-REPO_URL="${VIMALINX_REPO:-https://github.com/vimalinx/vimalinx-suite-core}"
+REPO_URL="${VIMALINX_REPO:-https://github.com/vimalinx/ClawNet.git}"
 REPO_DIR="${VIMALINX_REPO_DIR:-}"
 TARGET_USER="${VIMALINX_TARGET_USER:-}"
 USER_ID="${VIMALINX_USER_ID:-}"

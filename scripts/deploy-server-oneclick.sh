@@ -120,7 +120,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-GIT_REPO="${VIMALINX_REPO:-https://github.com/vimalinx/vimalinx-suite-core}"
+GIT_REPO="${VIMALINX_REPO:-https://github.com/vimalinx/ClawNet.git}"
 REPO_REF="${VIMALINX_REPO_REF:-}"
 INSTALL_DIR="${VIMALINX_INSTALL_DIR:-/opt/vimalinx-suite-core}"
 DATA_DIR="${VIMALINX_DATA_DIR:-/var/lib/vimalinx}"
@@ -407,7 +407,7 @@ echo "- Server URL: http://<your-server-ip>:${PORT}"
 if is_true "${SKIP_OPENCLAW}"; then
   echo "- Next (on your local OpenClaw machine):"
   echo "  git clone ${GIT_REPO}"
-  echo "  cd vimalinx-suite-core"
+  echo "  cd ClawNet"
   echo "  # First create contributor token in http://<server-ip>:${PORT}/admin"
   echo "  bash scripts/deploy-openclaw-node.sh --server-url http://<server-ip>:${PORT} --token <contributor-token>"
 elif [[ -z "${OPENCLAW_USER_ID}" || -z "${OPENCLAW_TOKEN}" ]]; then
