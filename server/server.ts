@@ -20,7 +20,15 @@ type UsersFile = {
   users: UserRecord[];
 };
 
-type IncomingClientMessage = {
+type ClientModeMetadata = {
+  modeId?: string;
+  modeLabel?: string;
+  modelHint?: string;
+  agentHint?: string;
+  skillsHint?: string;
+};
+
+type IncomingClientMessage = ClientModeMetadata & {
   userId?: string;
   token?: string;
   text?: string;
@@ -40,7 +48,7 @@ type SendPayload = {
   id?: string;
 };
 
-type InboundMessage = {
+type InboundMessage = ClientModeMetadata & {
   id?: string;
   chatId: string;
   chatName?: string;
@@ -79,6 +87,69 @@ type OutboxEntry = {
   payload: Record<string, unknown>;
 };
 
+type MachineRoutingConfig = {
+  modeAccountMap?: Record<string, string>;
+  modeModelHints?: Record<string, string>;
+  modeAgentHints?: Record<string, string>;
+  modeSkillsHints?: Record<string, string>;
+};
+
+type MachineRecord = {
+  machineId: string;
+  userId: string;
+  accountId?: string;
+  machineLabel?: string;
+  hostName?: string;
+  platform?: string;
+  arch?: string;
+  runtimeVersion?: string;
+  pluginVersion?: string;
+  status: "online" | "offline";
+  createdAt: number;
+  updatedAt: number;
+  lastSeenAt: number;
+  routing?: MachineRoutingConfig;
+};
+
+type MachinesFile = {
+  machines: MachineRecord[];
+};
+
+type MachineRegisterPayload = {
+  userId?: string;
+  token?: string;
+  machineId?: string;
+  accountId?: string;
+  machineLabel?: string;
+  hostName?: string;
+  platform?: string;
+  arch?: string;
+  runtimeVersion?: string;
+  pluginVersion?: string;
+  routing?: MachineRoutingConfig;
+};
+
+type MachineHeartbeatPayload = {
+  userId?: string;
+  token?: string;
+  machineId?: string;
+  status?: "online" | "offline";
+};
+
+type MachinePatchPayload = {
+  routing?: MachineRoutingConfig;
+  status?: "online" | "offline";
+  machineLabel?: string;
+};
+
+type MachineContributorPayload = {
+  userId?: string;
+  machineId?: string;
+  machineLabel?: string;
+  accountId?: string;
+  routing?: MachineRoutingConfig;
+};
+
 const __dirname = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const publicDir = resolve(__dirname, "public");
 const port = Number.parseInt(process.env.TEST_SERVER_PORT ?? "8788", 10);
@@ -92,6 +163,13 @@ const defaultUserId = process.env.TEST_DEFAULT_USER_ID?.trim();
 const defaultUserToken = process.env.TEST_DEFAULT_USER_TOKEN?.trim();
 const inboundMode = (process.env.TEST_INBOUND_MODE ?? "poll").trim().toLowerCase();
 const usersWritePath = process.env.TEST_USERS_WRITE_FILE?.trim() || usersFilePath;
+const machinesFilePath =
+  process.env.TEST_MACHINES_FILE?.trim() ||
+  (usersWritePath
+    ? resolve(dirname(usersWritePath), "machines.json")
+    : usersFilePath
+      ? resolve(dirname(usersFilePath), "machines.json")
+      : resolve(__dirname, "machines.json"));
 const allowRegistration = (process.env.TEST_ALLOW_REGISTRATION ?? "true").toLowerCase() === "true";
 const hmacSecret = process.env.TEST_HMAC_SECRET?.trim();
 const requireSignature = (process.env.TEST_REQUIRE_SIGNATURE ?? "").trim().toLowerCase();
@@ -106,8 +184,10 @@ const inviteCodes = normalizeInviteCodes(
 );
 
 const users = new Map<string, UserRecord>();
+const machines = new Map<string, MachineRecord>();
 let didMigrateUsers = false;
 let pendingUsersSave: NodeJS.Timeout | null = null;
+let pendingMachinesSave: NodeJS.Timeout | null = null;
 
 if (!hasSecretKey) {
   console.log("warning: TEST_SECRET_KEY not set; token hashing is disabled.");
@@ -316,6 +396,49 @@ function loadUsers() {
 
 loadUsers();
 
+function normalizeMachineRecord(entry: MachineRecord): MachineRecord | null {
+  const machineId = normalizeMachineId(entry.machineId);
+  const userId = normalizeUserId(entry.userId);
+  if (!machineId || !userId) return null;
+  const now = Date.now();
+  const createdAt = normalizeUsageNumber(entry.createdAt) ?? now;
+  const updatedAt = normalizeUsageNumber(entry.updatedAt) ?? createdAt;
+  const lastSeenAt = normalizeUsageNumber(entry.lastSeenAt) ?? updatedAt;
+  const status = normalizeMachineStatus(entry.status) ?? "offline";
+  return {
+    machineId,
+    userId,
+    accountId: normalizeAccountIdRef(entry.accountId),
+    machineLabel: normalizeHintField(entry.machineLabel, 80),
+    hostName: normalizeHintField(entry.hostName, 80),
+    platform: normalizeHintField(entry.platform, 40),
+    arch: normalizeHintField(entry.arch, 40),
+    runtimeVersion: normalizeHintField(entry.runtimeVersion, 40),
+    pluginVersion: normalizeHintField(entry.pluginVersion, 40),
+    status,
+    createdAt,
+    updatedAt,
+    lastSeenAt,
+    routing: normalizeMachineRoutingConfig(entry.routing),
+  };
+}
+
+function loadMachines() {
+  if (!machinesFilePath) return;
+  try {
+    const raw = readFileSync(machinesFilePath, "utf-8");
+    const parsed = parseJson<MachinesFile>(raw);
+    for (const entry of parsed?.machines ?? []) {
+      const normalized = normalizeMachineRecord(entry);
+      if (!normalized) continue;
+      machines.set(normalized.machineId, normalized);
+    }
+  } catch {
+  }
+}
+
+loadMachines();
+
 function normalizeUserId(value?: string): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
@@ -335,8 +458,125 @@ function normalizePassword(value?: string): string | null {
   return trimmed;
 }
 
+function normalizeHintField(value: unknown, maxLength = 120): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeModeId(value: unknown): string | undefined {
+  const normalized = normalizeHintField(value, 32)?.toLowerCase();
+  if (!normalized) return undefined;
+  if (!/^[a-z0-9_-]{1,32}$/.test(normalized)) return undefined;
+  return normalized;
+}
+
+function resolveModeMetadata(payload: IncomingClientMessage): ClientModeMetadata {
+  return {
+    modeId: normalizeModeId(payload.modeId),
+    modeLabel: normalizeHintField(payload.modeLabel, 40),
+    modelHint: normalizeHintField(payload.modelHint, 120),
+    agentHint: normalizeHintField(payload.agentHint, 120),
+    skillsHint: normalizeHintField(payload.skillsHint, 160),
+  };
+}
+
+function normalizeAccountIdRef(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (!/^[a-z0-9_-]{1,64}$/.test(normalized)) return undefined;
+  return normalized;
+}
+
+function normalizeMachineId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(normalized)) return undefined;
+  return normalized;
+}
+
+function normalizeMachineStatus(value: unknown): "online" | "offline" | undefined {
+  if (value === "online" || value === "offline") return value;
+  return undefined;
+}
+
+function normalizeModeAccountMap(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const next: Record<string, string> = {};
+  for (const [rawMode, rawAccount] of Object.entries(raw as Record<string, unknown>)) {
+    const modeId = normalizeModeId(rawMode);
+    const accountId = normalizeAccountIdRef(rawAccount);
+    if (!modeId || !accountId) continue;
+    next[modeId] = accountId;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function normalizeModeHintMap(
+  raw: unknown,
+  maxLength: number,
+): Record<string, string> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const next: Record<string, string> = {};
+  for (const [rawMode, rawHint] of Object.entries(raw as Record<string, unknown>)) {
+    const modeId = normalizeModeId(rawMode);
+    const hint = normalizeHintField(rawHint, maxLength);
+    if (!modeId || !hint) continue;
+    next[modeId] = hint;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function normalizeMachineRoutingConfig(raw: unknown): MachineRoutingConfig | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const source = raw as Record<string, unknown>;
+  const modeAccountMap = normalizeModeAccountMap(source.modeAccountMap);
+  const modeModelHints = normalizeModeHintMap(source.modeModelHints, 120);
+  const modeAgentHints = normalizeModeHintMap(source.modeAgentHints, 120);
+  const modeSkillsHints = normalizeModeHintMap(source.modeSkillsHints, 160);
+  if (!modeAccountMap && !modeModelHints && !modeAgentHints && !modeSkillsHints) {
+    return undefined;
+  }
+  return {
+    modeAccountMap,
+    modeModelHints,
+    modeAgentHints,
+    modeSkillsHints,
+  };
+}
+
+function sanitizeMachineRecordForResponse(record: MachineRecord): Record<string, unknown> {
+  return {
+    machineId: record.machineId,
+    userId: record.userId,
+    accountId: record.accountId,
+    machineLabel: record.machineLabel,
+    hostName: record.hostName,
+    platform: record.platform,
+    arch: record.arch,
+    runtimeVersion: record.runtimeVersion,
+    pluginVersion: record.pluginVersion,
+    status: record.status,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    lastSeenAt: record.lastSeenAt,
+    routing: record.routing,
+  };
+}
+
 function generateToken(): string {
   return randomUUID().replace(/-/g, "");
+}
+
+function generateContributorUserId(): string {
+  let next = `contrib_${randomUUID().replace(/-/g, "").slice(0, 10)}`;
+  while (users.has(next)) {
+    next = `contrib_${randomUUID().replace(/-/g, "").slice(0, 10)}`;
+  }
+  return next;
 }
 
 function makeDeviceKey(userId: string, token: string): string {
@@ -402,6 +642,89 @@ function scheduleUsersSave(): void {
       // Ignore background save failures; explicit writes handle errors.
     }
   }, 1000);
+}
+
+function saveMachinesSnapshot(entries: MachineRecord[]) {
+  if (!machinesFilePath) return;
+  mkdirSync(dirname(machinesFilePath), { recursive: true });
+  const data = JSON.stringify({ machines: entries }, null, 2);
+  writeFileSync(machinesFilePath, data, "utf-8");
+}
+
+function scheduleMachinesSave(): void {
+  if (!machinesFilePath) return;
+  if (pendingMachinesSave) return;
+  pendingMachinesSave = setTimeout(() => {
+    pendingMachinesSave = null;
+    try {
+      const entries = [...machines.values()].sort((a, b) => a.machineId.localeCompare(b.machineId));
+      saveMachinesSnapshot(entries);
+    } catch {
+    }
+  }, 1000);
+}
+
+function upsertMachineRecord(params: {
+  userId: string;
+  machineId?: string;
+  accountId?: string;
+  machineLabel?: string;
+  hostName?: string;
+  platform?: string;
+  arch?: string;
+  runtimeVersion?: string;
+  pluginVersion?: string;
+  routing?: MachineRoutingConfig;
+}): MachineRecord {
+  const machineId =
+    normalizeMachineId(params.machineId) ?? `m_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  const now = Date.now();
+  const existing = machines.get(machineId);
+  const createdAt = existing?.createdAt ?? now;
+  const next: MachineRecord = {
+    machineId,
+    userId: params.userId,
+    accountId: normalizeAccountIdRef(params.accountId) ?? existing?.accountId,
+    machineLabel: normalizeHintField(params.machineLabel, 80) ?? existing?.machineLabel,
+    hostName: normalizeHintField(params.hostName, 80) ?? existing?.hostName,
+    platform: normalizeHintField(params.platform, 40) ?? existing?.platform,
+    arch: normalizeHintField(params.arch, 40) ?? existing?.arch,
+    runtimeVersion: normalizeHintField(params.runtimeVersion, 40) ?? existing?.runtimeVersion,
+    pluginVersion: normalizeHintField(params.pluginVersion, 40) ?? existing?.pluginVersion,
+    status: "online",
+    createdAt,
+    updatedAt: now,
+    lastSeenAt: now,
+    routing: params.routing ?? existing?.routing,
+  };
+  machines.set(machineId, next);
+  scheduleMachinesSave();
+  return next;
+}
+
+function resolveOwnedMachine(userId: string, machineId?: string): MachineRecord | null {
+  const normalized = normalizeMachineId(machineId);
+  if (!normalized) return null;
+  const entry = machines.get(normalized);
+  if (!entry) return null;
+  if (entry.userId !== userId) return null;
+  return entry;
+}
+
+function touchMachineHeartbeat(params: {
+  entry: MachineRecord;
+  status?: "online" | "offline";
+}): MachineRecord {
+  const now = Date.now();
+  const next: MachineRecord = {
+    ...params.entry,
+    status: params.status ?? "online",
+    updatedAt: now,
+    lastSeenAt: now,
+  };
+  machines.set(next.machineId, next);
+  scheduleMachinesSave();
+  return next;
 }
 
 function ensureTokenUsage(entry: UserRecord, token: string): TokenUsage | null {
@@ -877,6 +1200,7 @@ function buildInboundMessage(
   const senderName = payload.senderName?.trim() || user.displayName || user.id;
   const chatName = payload.chatName?.trim() || undefined;
   const id = typeof payload.id === "string" ? payload.id.trim() : undefined;
+  const modeMetadata = resolveModeMetadata(payload);
   return {
     id,
     chatId,
@@ -887,6 +1211,7 @@ function buildInboundMessage(
     text: payload.text ?? "",
     mentioned: Boolean(payload.mentioned),
     timestamp: Date.now(),
+    ...modeMetadata,
   };
 }
 
@@ -940,6 +1265,26 @@ function verifyServerToken(req: IncomingMessage, user: UserRecord | null): boole
   return false;
 }
 
+function verifyAdminServerToken(req: IncomingMessage): boolean {
+  const provided = readBearerToken(req);
+  if (!serverToken || !provided) return false;
+  return provided === serverToken;
+}
+
+function resolveMachineAuth(params: {
+  req: IncomingMessage;
+  userId?: string;
+  token?: string;
+}): AuthMatch | null {
+  const userId = params.userId?.trim() || readUserIdHeader(params.req) || undefined;
+  const token = params.token?.trim() || readBearerToken(params.req) || undefined;
+  return resolveAuthMatch({
+    userId,
+    secret: token,
+    allowPassword: false,
+  });
+}
+
 function serveFile(res: ServerResponse, path: string) {
   try {
     const data = readFileSync(path);
@@ -974,8 +1319,376 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/machine/register") {
+    const clientId = resolveClientIp(req);
+    if (!checkRateLimit(`machine-register:${clientId}`, 120, 60 * 1000)) {
+      sendJson(res, 429, { error: "rate limited" });
+      return;
+    }
+    const raw = await readBody(req, 1024 * 1024).catch((err: Error) => {
+      sendJson(res, 413, { error: err.message });
+      return null;
+    });
+    if (!raw) return;
+    const payload = parseJson<MachineRegisterPayload>(raw);
+    if (!payload) {
+      sendJson(res, 400, { error: "invalid JSON" });
+      return;
+    }
+    const auth = resolveMachineAuth({
+      req,
+      userId: payload.userId,
+      token: payload.token,
+    });
+    if (!auth) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    const signatureError = verifySignedRequest({
+      req,
+      body: raw,
+      scope: `machine-register:${auth.user.id}`,
+    });
+    if (signatureError) {
+      sendJson(res, 401, { error: signatureError });
+      return;
+    }
+    const machineId = normalizeMachineId(payload.machineId);
+    if (machineId) {
+      const existing = machines.get(machineId);
+      if (existing && existing.userId !== auth.user.id) {
+        sendJson(res, 409, { error: "machineId already in use" });
+        return;
+      }
+    }
+    const hasRoutingField = Object.prototype.hasOwnProperty.call(payload, "routing");
+    const routing = normalizeMachineRoutingConfig(payload.routing);
+    if (hasRoutingField && payload.routing && !routing) {
+      sendJson(res, 400, { error: "invalid routing" });
+      return;
+    }
+    const machine = upsertMachineRecord({
+      userId: auth.user.id,
+      machineId,
+      accountId: payload.accountId,
+      machineLabel: payload.machineLabel,
+      hostName: payload.hostName,
+      platform: payload.platform,
+      arch: payload.arch,
+      runtimeVersion: payload.runtimeVersion,
+      pluginVersion: payload.pluginVersion,
+      routing,
+    });
+    sendJson(res, 200, {
+      ok: true,
+      machine: sanitizeMachineRecordForResponse(machine),
+      config: { routing: machine.routing ?? {} },
+      serverTime: Date.now(),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/machine/heartbeat") {
+    const clientId = resolveClientIp(req);
+    if (!checkRateLimit(`machine-heartbeat:${clientId}`, 240, 60 * 1000)) {
+      sendJson(res, 429, { error: "rate limited" });
+      return;
+    }
+    const raw = await readBody(req, 1024 * 1024).catch((err: Error) => {
+      sendJson(res, 413, { error: err.message });
+      return null;
+    });
+    if (!raw) return;
+    const payload = parseJson<MachineHeartbeatPayload>(raw);
+    if (!payload) {
+      sendJson(res, 400, { error: "invalid JSON" });
+      return;
+    }
+    const auth = resolveMachineAuth({
+      req,
+      userId: payload.userId,
+      token: payload.token,
+    });
+    if (!auth) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    const signatureError = verifySignedRequest({
+      req,
+      body: raw,
+      scope: `machine-heartbeat:${auth.user.id}`,
+    });
+    if (signatureError) {
+      sendJson(res, 401, { error: signatureError });
+      return;
+    }
+    const machine = resolveOwnedMachine(auth.user.id, payload.machineId);
+    if (!machine) {
+      sendJson(res, 404, { error: "machine not found" });
+      return;
+    }
+    const status = normalizeMachineStatus(payload.status);
+    if (payload.status && !status) {
+      sendJson(res, 400, { error: "invalid status" });
+      return;
+    }
+    const next = touchMachineHeartbeat({
+      entry: machine,
+      status,
+    });
+    sendJson(res, 200, {
+      ok: true,
+      machine: sanitizeMachineRecordForResponse(next),
+      config: { routing: next.routing ?? {} },
+      serverTime: Date.now(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/machine/config") {
+    const auth = resolveMachineAuth({
+      req,
+      userId: url.searchParams.get("userId") ?? undefined,
+      token: url.searchParams.get("token") ?? undefined,
+    });
+    if (!auth) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    const machineId = normalizeMachineId(url.searchParams.get("machineId") ?? undefined);
+    if (!machineId) {
+      sendJson(res, 400, { error: "machineId required" });
+      return;
+    }
+    const machine = resolveOwnedMachine(auth.user.id, machineId);
+    if (!machine) {
+      sendJson(res, 404, { error: "machine not found" });
+      return;
+    }
+    sendJson(res, 200, {
+      ok: true,
+      machine: sanitizeMachineRecordForResponse(machine),
+      config: { routing: machine.routing ?? {} },
+      serverTime: Date.now(),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/machines/contributors") {
+    if (!serverToken) {
+      sendJson(res, 403, { error: "server token disabled" });
+      return;
+    }
+    if (!verifyAdminServerToken(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    const raw = await readBody(req, 1024 * 1024).catch((err: Error) => {
+      sendJson(res, 413, { error: err.message });
+      return null;
+    });
+    if (!raw) return;
+    const payload = parseJson<MachineContributorPayload>(raw);
+    if (!payload) {
+      sendJson(res, 400, { error: "invalid JSON" });
+      return;
+    }
+
+    const requestedUserId = normalizeUserId(payload.userId ?? undefined);
+    const userId = requestedUserId ?? generateContributorUserId();
+    if (users.has(userId)) {
+      sendJson(res, 409, { error: "user exists" });
+      return;
+    }
+
+    const machineId =
+      normalizeMachineId(payload.machineId ?? undefined) ??
+      `m_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    if (machines.has(machineId)) {
+      sendJson(res, 409, { error: "machineId already in use" });
+      return;
+    }
+
+    const hasRoutingField = Object.prototype.hasOwnProperty.call(payload, "routing");
+    const routing = normalizeMachineRoutingConfig(payload.routing);
+    if (hasRoutingField && payload.routing && !routing) {
+      sendJson(res, 400, { error: "invalid routing" });
+      return;
+    }
+
+    const displayName = normalizeHintField(payload.machineLabel, 80) ?? userId;
+    const accountId = normalizeAccountIdRef(payload.accountId) ?? "default";
+    const contributor: UserRecord = {
+      id: userId,
+      displayName,
+    };
+
+    let token = generateToken();
+    while (isTokenInUse(token, userId)) {
+      token = generateToken();
+    }
+    addUserToken(contributor, token);
+
+    try {
+      const nextUsers = [...users.values(), contributor].sort((a, b) => a.id.localeCompare(b.id));
+      saveUsersSnapshot(nextUsers);
+    } catch (err) {
+      sendJson(res, 500, { error: String(err) });
+      return;
+    }
+    users.set(userId, contributor);
+
+    const now = Date.now();
+    const machine: MachineRecord = {
+      machineId,
+      userId,
+      accountId,
+      machineLabel: displayName,
+      status: "offline",
+      createdAt: now,
+      updatedAt: now,
+      lastSeenAt: now,
+      routing,
+    };
+    machines.set(machineId, machine);
+    scheduleMachinesSave();
+
+    sendJson(res, 200, {
+      ok: true,
+      contributor: {
+        userId,
+        token,
+        machineId,
+        accountId,
+      },
+      machine: sanitizeMachineRecordForResponse(machine),
+      serverTime: now,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/machines") {
+    const isAdmin = Boolean(serverToken) && verifyAdminServerToken(req);
+    const userAuth = isAdmin
+      ? null
+      : resolveMachineAuth({
+          req,
+          userId: url.searchParams.get("userId") ?? undefined,
+          token: url.searchParams.get("token") ?? undefined,
+        });
+    if (!isAdmin && !userAuth) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    const machineList = [...machines.values()]
+      .filter((entry) => (isAdmin ? true : entry.userId === userAuth?.user.id))
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt)
+      .map((entry) => sanitizeMachineRecordForResponse(entry));
+    sendJson(res, 200, {
+      ok: true,
+      count: machineList.length,
+      machines: machineList,
+      scope: isAdmin ? "admin" : "user",
+      serverTime: Date.now(),
+    });
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/machines/")) {
+    const isAdmin = Boolean(serverToken) && verifyAdminServerToken(req);
+    const userAuth = isAdmin
+      ? null
+      : resolveMachineAuth({
+          req,
+          userId: url.searchParams.get("userId") ?? undefined,
+          token: url.searchParams.get("token") ?? undefined,
+        });
+    if (!isAdmin && !userAuth) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    const rawMachineId = url.pathname.slice("/api/machines/".length);
+    const machineId = normalizeMachineId(decodeURIComponent(rawMachineId));
+    if (!machineId) {
+      sendJson(res, 400, { error: "invalid machineId" });
+      return;
+    }
+    const current = machines.get(machineId);
+    if (!current) {
+      sendJson(res, 404, { error: "machine not found" });
+      return;
+    }
+    if (!isAdmin && current.userId !== userAuth?.user.id) {
+      sendJson(res, 404, { error: "machine not found" });
+      return;
+    }
+
+    if (req.method === "GET") {
+      sendJson(res, 200, {
+        ok: true,
+        machine: sanitizeMachineRecordForResponse(current),
+        serverTime: Date.now(),
+      });
+      return;
+    }
+
+    if (req.method === "PATCH") {
+      const raw = await readBody(req, 1024 * 1024).catch((err: Error) => {
+        sendJson(res, 413, { error: err.message });
+        return null;
+      });
+      if (!raw) return;
+      const payload = parseJson<MachinePatchPayload>(raw);
+      if (!payload) {
+        sendJson(res, 400, { error: "invalid JSON" });
+        return;
+      }
+
+      const hasRoutingField = Object.prototype.hasOwnProperty.call(payload, "routing");
+      const routing = normalizeMachineRoutingConfig(payload.routing);
+      if (hasRoutingField && payload.routing && !routing) {
+        sendJson(res, 400, { error: "invalid routing" });
+        return;
+      }
+      const hasStatusField = Object.prototype.hasOwnProperty.call(payload, "status");
+      const status = normalizeMachineStatus(payload.status);
+      if (hasStatusField && payload.status && !status) {
+        sendJson(res, 400, { error: "invalid status" });
+        return;
+      }
+      const hasMachineLabelField = Object.prototype.hasOwnProperty.call(payload, "machineLabel");
+      const machineLabel = normalizeHintField(payload.machineLabel, 80);
+
+      const now = Date.now();
+      const next: MachineRecord = {
+        ...current,
+        updatedAt: now,
+        status: status ?? current.status,
+        routing: hasRoutingField ? routing : current.routing,
+        machineLabel: hasMachineLabelField ? machineLabel : current.machineLabel,
+      };
+      machines.set(machineId, next);
+      scheduleMachinesSave();
+
+      sendJson(res, 200, {
+        ok: true,
+        machine: sanitizeMachineRecordForResponse(next),
+        serverTime: Date.now(),
+      });
+      return;
+    }
+
+    sendJson(res, 405, { error: "method not allowed" });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/") {
     serveFile(res, resolve(publicDir, "index.html"));
+    return;
+  }
+
+  if (req.method === "GET" && (url.pathname === "/admin" || url.pathname === "/admin.html")) {
+    serveFile(res, resolve(publicDir, "admin.html"));
     return;
   }
 

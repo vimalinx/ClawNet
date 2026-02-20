@@ -122,6 +122,15 @@
         letter-spacing: 0.06em;
         text-transform: uppercase;
       }
+      .brand-link {
+        margin-top: 4px;
+        font-size: 12px;
+      }
+      .brand-link a {
+        color: var(--accent-dark);
+        text-decoration: none;
+        font-weight: 600;
+      }
       .status {
         font-size: 12px;
         padding: 4px 10px;
@@ -472,6 +481,7 @@
           <div>
             <div class="brand-title">Vimagram</div>
             <div class="brand-sub">Bridge Client</div>
+            <div class="brand-link"><a href="/admin" target="_blank" rel="noopener noreferrer">Machine Console</a></div>
           </div>
         </div>
 
@@ -725,7 +735,7 @@
           return;
         }
         const baseUrl = window.location.origin;
-        configSnippetEl.textContent = `channels: {\n  vimalinx: {\n    enabled: true,\n    baseUrl: \"${baseUrl}\",\n    token: \"${token}\",\n    userId: \"${userId}\",\n    inboundMode: \"poll\",\n    dmPolicy: \"open\",\n    allowFrom: [\"*\"]\n  }\n}`;
+        configSnippetEl.textContent = `channels: {\n  vimalinx: {\n    enabled: true,\n    baseUrl: \"${baseUrl}\",\n    token: \"${token}\",\n    userId: \"${userId}\",\n    inboundMode: \"poll\",\n    dmPolicy: \"open\",\n    allowFrom: [\"*\"],\n    autoRegisterMachine: true,\n    machineHeartbeatMs: 30000\n  }\n}`;
       }
 
       function connect() {

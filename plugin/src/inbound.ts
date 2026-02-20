@@ -1,5 +1,6 @@
 import {
   logInboundDrop,
+  normalizeAccountId,
   resolveControlCommandGate,
   resolveMentionGatingWithBypass,
   resolveNestedAllowlistDecision,
@@ -15,6 +16,10 @@ import {
 import { checkSenderRateLimit, resolveTestSecurityConfig } from "./security.js";
 import { sendTestMessage } from "./send.js";
 import { getTestRuntime } from "./runtime.js";
+import {
+  getRegisteredMachineProfile,
+  type MachineRoutingConfig,
+} from "./machine-state.js";
 import type { TestConfig, TestGroupConfig, TestInboundMessage } from "./types.js";
 
 const CHANNEL_ID = "vimalinx" as const;
@@ -70,6 +75,103 @@ function resolveRequireMention(params: { groupConfig?: TestGroupConfig; wildcard
     return params.wildcardConfig.requireMention;
   }
   return true;
+}
+
+type ModeMetadata = {
+  modeId?: string;
+  modeLabel?: string;
+  modelHint?: string;
+  agentHint?: string;
+  skillsHint?: string;
+};
+
+function normalizeModeHint(value: string | undefined, maxLength = 120): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeModeId(value: string | undefined): string | undefined {
+  const normalized = normalizeModeHint(value, 32)?.toLowerCase();
+  if (!normalized) return undefined;
+  if (!/^[a-z0-9_-]{1,32}$/.test(normalized)) return undefined;
+  return normalized;
+}
+
+function resolveModeMetadata(message: TestInboundMessage): ModeMetadata {
+  return {
+    modeId: normalizeModeId(message.modeId),
+    modeLabel: normalizeModeHint(message.modeLabel, 40),
+    modelHint: normalizeModeHint(message.modelHint, 120),
+    agentHint: normalizeModeHint(message.agentHint, 120),
+    skillsHint: normalizeModeHint(message.skillsHint, 160),
+  };
+}
+
+function resolveModeValue(
+  source: Record<string, string> | undefined,
+  modeId: string | undefined,
+  maxLength: number,
+): string | undefined {
+  if (!source || !modeId) return undefined;
+  const key = Object.keys(source).find((entry) => normalizeModeId(entry) === modeId);
+  if (!key) return undefined;
+  return normalizeModeHint(source[key], maxLength);
+}
+
+function applyMachineRoutingHints(
+  mode: ModeMetadata,
+  routing: MachineRoutingConfig | undefined,
+): ModeMetadata {
+  if (!routing) return mode;
+  const modeId = mode.modeId;
+  const modelHint =
+    mode.modelHint ?? resolveModeValue(routing.modeModelHints, modeId, 120);
+  const agentHint =
+    mode.agentHint ?? resolveModeValue(routing.modeAgentHints, modeId, 120);
+  const skillsHint =
+    mode.skillsHint ?? resolveModeValue(routing.modeSkillsHints, modeId, 160);
+  return {
+    ...mode,
+    modelHint,
+    agentHint,
+    skillsHint,
+  };
+}
+
+function resolveModeRoutingMap(
+  account: ResolvedTestAccount,
+  routing: MachineRoutingConfig | undefined,
+): Record<string, string> | undefined {
+  return routing?.modeAccountMap ?? account.config.modeAccountMap;
+}
+
+function resolveModeRouteAccountId(
+  account: ResolvedTestAccount,
+  mode: ModeMetadata,
+  mapping?: Record<string, string>,
+): string {
+  if (!mode.modeId) return account.accountId;
+  if (!mapping || typeof mapping !== "object") return account.accountId;
+
+  const mappedAccount = Object.entries(mapping).find(
+    ([modeKey]) => normalizeModeId(modeKey) === mode.modeId,
+  )?.[1];
+  const normalized = normalizeModeHint(mappedAccount, 64);
+  if (!normalized) return account.accountId;
+  return normalizeAccountId(normalized);
+}
+
+function buildModeUntrustedContext(mode: ModeMetadata): string[] {
+  const lines: string[] = [];
+  if (mode.modeId || mode.modeLabel) {
+    const label = mode.modeLabel ? ` (${mode.modeLabel})` : "";
+    lines.push(`Client mode: ${mode.modeId ?? "unknown"}${label}`);
+  }
+  if (mode.modelHint) lines.push(`Client model hint: ${mode.modelHint}`);
+  if (mode.agentHint) lines.push(`Client agent hint: ${mode.agentHint}`);
+  if (mode.skillsHint) lines.push(`Client skills hint: ${mode.skillsHint}`);
+  return lines;
 }
 
 function normalizeTimestamp(value?: number): number {
@@ -174,6 +276,13 @@ export async function handleTestInbound(params: {
   const chatId = message.chatId;
   const chatName = message.chatName;
   const timestamp = normalizeTimestamp(message.timestamp);
+  const machineProfile = getRegisteredMachineProfile(account.accountId);
+  const modeRouting = resolveModeRoutingMap(account, machineProfile?.routing);
+  const modeMetadata = applyMachineRoutingHints(
+    resolveModeMetadata(message),
+    machineProfile?.routing,
+  );
+  const modeUntrustedContext = buildModeUntrustedContext(modeMetadata);
 
   statusSink?.({ lastInboundAt: timestamp });
 
@@ -333,7 +442,7 @@ export async function handleTestInbound(params: {
   const route = core.channel.routing.resolveAgentRoute({
     cfg: config as ClawdbotConfig,
     channel: CHANNEL_ID,
-    accountId: account.accountId,
+    accountId: resolveModeRouteAccountId(account, modeMetadata, modeRouting),
     peer: {
       kind: isGroup ? "group" : "dm",
       id: chatId,
@@ -381,6 +490,12 @@ export async function handleTestInbound(params: {
     SenderId: senderId,
     GroupSubject: isGroup ? chatName || chatId : undefined,
     GroupSystemPrompt: isGroup ? groupSystemPrompt : undefined,
+    UntrustedContext: modeUntrustedContext.length > 0 ? modeUntrustedContext : undefined,
+    ModeId: modeMetadata.modeId,
+    ModeLabel: modeMetadata.modeLabel,
+    ModelHint: modeMetadata.modelHint,
+    AgentHint: modeMetadata.agentHint,
+    SkillsHint: modeMetadata.skillsHint,
     Provider: CHANNEL_ID,
     Surface: CHANNEL_ID,
     WasMentioned: isGroup ? Boolean(message.mentioned) : undefined,

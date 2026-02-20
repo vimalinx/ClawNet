@@ -1,7 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createHash } from "node:crypto";
+import { hostname } from "node:os";
 
 import type { ResolvedTestAccount } from "./accounts.js";
 import { handleTestInbound } from "./inbound.js";
+import {
+  clearRegisteredMachineProfile,
+  setRegisteredMachineProfile,
+  type RegisteredMachineProfile,
+} from "./machine-state.js";
 import {
   checkAndStoreNonce,
   checkGlobalRateLimit,
@@ -20,6 +27,7 @@ const DEFAULT_WEBHOOK_PATH = "/vimalinx-webhook";
 const DEFAULT_POLL_INTERVAL_MS = 1500;
 const DEFAULT_POLL_WAIT_MS = 20000;
 const MAX_POLL_WAIT_MS = 30000;
+const DEFAULT_MACHINE_HEARTBEAT_MS = 30000;
 
 type WebhookTarget = {
   account: ResolvedTestAccount;
@@ -77,6 +85,146 @@ function buildPollUrl(baseUrl: string, userId: string, waitMs: number): string {
   url.searchParams.set("userId", userId);
   url.searchParams.set("waitMs", String(waitMs));
   return url.toString();
+}
+
+function buildMachineApiUrl(baseUrl: string, path: string): string {
+  return new URL(path, buildBaseUrl(baseUrl)).toString();
+}
+
+function shouldAutoRegisterMachine(account: ResolvedTestAccount): boolean {
+  return account.config.autoRegisterMachine !== false;
+}
+
+function resolveMachineHeartbeatMs(account: ResolvedTestAccount): number {
+  const raw = Number(account.config.machineHeartbeatMs);
+  if (!Number.isFinite(raw)) return DEFAULT_MACHINE_HEARTBEAT_MS;
+  return Math.max(5000, Math.min(Math.floor(raw), 300000));
+}
+
+function normalizeMachineId(value?: string): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(normalized)) return undefined;
+  return normalized;
+}
+
+function resolveMachineId(account: ResolvedTestAccount, userId: string): string {
+  const explicit = normalizeMachineId(account.config.machineId);
+  if (explicit) return explicit;
+  const source = `${hostname()}:${userId}:${account.accountId}`;
+  const digest = createHash("sha1").update(source).digest("hex").slice(0, 20);
+  return `m_${digest}`;
+}
+
+function resolveMachineLabel(account: ResolvedTestAccount, userId: string): string {
+  const configured = account.config.machineLabel?.trim();
+  if (configured) return configured.slice(0, 80);
+  return `${hostname()}:${userId}:${account.accountId}`.slice(0, 80);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function normalizeModeMapFromResponse(value: unknown): Record<string, string> | undefined {
+  const source = asRecord(value);
+  if (!source) return undefined;
+  const next: Record<string, string> = {};
+  for (const [rawMode, rawTarget] of Object.entries(source)) {
+    const modeId = rawMode.trim().toLowerCase();
+    if (!/^[a-z0-9_-]{1,32}$/.test(modeId)) continue;
+    const target = typeof rawTarget === "string" ? rawTarget.trim().toLowerCase() : "";
+    if (!/^[a-z0-9_-]{1,64}$/.test(target)) continue;
+    next[modeId] = target;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function normalizeModeHintMapFromResponse(
+  value: unknown,
+  maxLength: number,
+): Record<string, string> | undefined {
+  const source = asRecord(value);
+  if (!source) return undefined;
+  const next: Record<string, string> = {};
+  for (const [rawMode, rawHint] of Object.entries(source)) {
+    const modeId = rawMode.trim().toLowerCase();
+    if (!/^[a-z0-9_-]{1,32}$/.test(modeId)) continue;
+    const hint = typeof rawHint === "string" ? rawHint.trim() : "";
+    if (!hint) continue;
+    next[modeId] = hint.slice(0, maxLength);
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function parseRegisteredMachineProfile(payload: unknown): RegisteredMachineProfile | null {
+  const root = asRecord(payload);
+  const machine = asRecord(root?.machine);
+  const config = asRecord(root?.config);
+  const routing = asRecord(config?.routing);
+  const machineIdRaw = machine?.machineId;
+  const machineId = typeof machineIdRaw === "string" ? normalizeMachineId(machineIdRaw) : undefined;
+  if (!machineId) return null;
+  const parsedRouting =
+    routing
+      ? {
+          modeAccountMap: normalizeModeMapFromResponse(routing.modeAccountMap),
+          modeModelHints: normalizeModeHintMapFromResponse(routing.modeModelHints, 120),
+          modeAgentHints: normalizeModeHintMapFromResponse(routing.modeAgentHints, 120),
+          modeSkillsHints: normalizeModeHintMapFromResponse(routing.modeSkillsHints, 160),
+        }
+      : undefined;
+  const updatedAt = typeof machine.updatedAt === "number" ? machine.updatedAt : undefined;
+  const lastSeenAt = typeof machine.lastSeenAt === "number" ? machine.lastSeenAt : undefined;
+  return {
+    machineId,
+    routing: parsedRouting,
+    updatedAt,
+    lastSeenAt,
+  };
+}
+
+async function callMachineEndpoint(params: {
+  account: ResolvedTestAccount;
+  path: string;
+  body: Record<string, unknown>;
+  security: ReturnType<typeof resolveTestSecurityConfig>;
+  abortSignal: AbortSignal;
+}): Promise<unknown> {
+  const baseUrl = params.account.baseUrl;
+  if (!baseUrl) throw new Error("baseUrl is not configured");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const token = params.account.token ?? params.account.webhookToken;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const body = JSON.stringify(params.body);
+  if (params.security.signOutbound && params.security.hmacSecret) {
+    const timestamp = Date.now();
+    const nonce = generateNonce();
+    const signature = createTestSignature({
+      secret: params.security.hmacSecret,
+      timestamp,
+      nonce,
+      body,
+    });
+    headers["x-vimalinx-timestamp"] = String(timestamp);
+    headers["x-vimalinx-nonce"] = nonce;
+    headers["x-vimalinx-signature"] = signature;
+  }
+  const response = await fetch(buildMachineApiUrl(baseUrl, params.path), {
+    method: "POST",
+    headers,
+    body,
+    signal: params.abortSignal,
+  });
+  const parsed = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = asRecord(parsed)?.error;
+    const message = typeof error === "string" && error ? error : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return parsed;
 }
 
 function delay(ms: number): Promise<void> {
@@ -165,6 +313,14 @@ function parseInboundMessage(payload: TestInboundPayload): TestInboundMessage | 
   const mentioned = typeof source.mentioned === "boolean" ? source.mentioned : undefined;
   const timestamp = typeof source.timestamp === "number" ? source.timestamp : undefined;
   const id = typeof source.id === "string" ? source.id.trim() : undefined;
+  const modeId =
+    typeof source.modeId === "string" && source.modeId.trim()
+      ? source.modeId.trim().toLowerCase()
+      : undefined;
+  const modeLabel = typeof source.modeLabel === "string" ? source.modeLabel.trim() : undefined;
+  const modelHint = typeof source.modelHint === "string" ? source.modelHint.trim() : undefined;
+  const agentHint = typeof source.agentHint === "string" ? source.agentHint.trim() : undefined;
+  const skillsHint = typeof source.skillsHint === "string" ? source.skillsHint.trim() : undefined;
 
   return {
     id,
@@ -176,6 +332,11 @@ function parseInboundMessage(payload: TestInboundPayload): TestInboundMessage | 
     text,
     mentioned,
     timestamp,
+    modeId,
+    modeLabel,
+    modelHint,
+    agentHint,
+    skillsHint,
   };
 }
 
@@ -316,6 +477,85 @@ async function startTestPoller(params: {
   return () => {
     stopped = true;
   };
+}
+
+async function registerMachineForAccount(params: {
+  account: ResolvedTestAccount;
+  runtime: { log?: (message: string) => void; error?: (message: string) => void };
+  abortSignal: AbortSignal;
+}): Promise<RegisteredMachineProfile | null> {
+  if (!shouldAutoRegisterMachine(params.account)) return null;
+  if (!params.account.baseUrl) return null;
+  const token = params.account.token ?? params.account.webhookToken;
+  if (!token) return null;
+
+  const userId = resolveUserId(params.account);
+  const machineId = resolveMachineId(params.account, userId);
+  const security = resolveTestSecurityConfig(params.account.config.security);
+  try {
+    const payload = await callMachineEndpoint({
+      account: params.account,
+      path: "api/machine/register",
+      body: {
+        userId,
+        token,
+        machineId,
+        accountId: params.account.accountId,
+        machineLabel: resolveMachineLabel(params.account, userId),
+        hostName: hostname(),
+        platform: process.platform,
+        arch: process.arch,
+        runtimeVersion: process.version,
+      },
+      security,
+      abortSignal: params.abortSignal,
+    });
+    const profile = parseRegisteredMachineProfile(payload);
+    if (!profile) {
+      params.runtime.error?.(`vimalinx machine register failed for ${params.account.accountId}: invalid response`);
+      return null;
+    }
+    setRegisteredMachineProfile(params.account.accountId, profile);
+    params.runtime.log?.(`vimalinx machine registered: ${profile.machineId}`);
+    return profile;
+  } catch (err) {
+    params.runtime.error?.(`vimalinx machine register failed for ${params.account.accountId}: ${String(err)}`);
+    return null;
+  }
+}
+
+async function heartbeatMachineForAccount(params: {
+  account: ResolvedTestAccount;
+  machineId: string;
+  runtime: { log?: (message: string) => void; error?: (message: string) => void };
+  abortSignal: AbortSignal;
+  status?: "online" | "offline";
+}): Promise<void> {
+  if (!params.account.baseUrl) return;
+  const token = params.account.token ?? params.account.webhookToken;
+  if (!token) return;
+  const userId = resolveUserId(params.account);
+  const security = resolveTestSecurityConfig(params.account.config.security);
+  try {
+    const payload = await callMachineEndpoint({
+      account: params.account,
+      path: "api/machine/heartbeat",
+      body: {
+        userId,
+        token,
+        machineId: params.machineId,
+        status: params.status,
+      },
+      security,
+      abortSignal: params.abortSignal,
+    });
+    const profile = parseRegisteredMachineProfile(payload);
+    if (profile) {
+      setRegisteredMachineProfile(params.account.accountId, profile);
+    }
+  } catch (err) {
+    params.runtime.error?.(`vimalinx machine heartbeat failed for ${params.account.accountId}: ${String(err)}`);
+  }
 }
 
 export async function handleTestWebhookRequest(
@@ -518,18 +758,59 @@ export async function startTestMonitor(params: {
   inboundMode?: "webhook" | "poll";
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
 }): Promise<() => void> {
-  const mode = normalizeInboundMode(params.inboundMode ?? params.account.config.inboundMode);
-  if (mode === "poll") {
-    return await startTestPoller(params);
-  }
-  const path = params.account.webhookPath ?? DEFAULT_WEBHOOK_PATH;
-  return registerTestWebhookTarget({
+  clearRegisteredMachineProfile(params.account.accountId);
+  const profile = await registerMachineForAccount({
     account: params.account,
-    config: params.config,
     runtime: params.runtime,
     abortSignal: params.abortSignal,
-    statusSink: params.statusSink,
-    path,
-    expectedToken: params.account.webhookToken ?? params.account.token,
   });
+
+  let stopHeartbeat = () => {};
+  if (profile?.machineId) {
+    const heartbeatMs = resolveMachineHeartbeatMs(params.account);
+    const timer = setInterval(() => {
+      if (params.abortSignal.aborted) return;
+      void heartbeatMachineForAccount({
+        account: params.account,
+        machineId: profile.machineId,
+        runtime: params.runtime,
+        abortSignal: params.abortSignal,
+      });
+    }, heartbeatMs);
+    stopHeartbeat = () => clearInterval(timer);
+  }
+
+  const mode = normalizeInboundMode(params.inboundMode ?? params.account.config.inboundMode);
+  let stopTransport: (() => void) | undefined;
+  if (mode === "poll") {
+    stopTransport = await startTestPoller(params);
+  } else {
+    const path = params.account.webhookPath ?? DEFAULT_WEBHOOK_PATH;
+    stopTransport = registerTestWebhookTarget({
+      account: params.account,
+      config: params.config,
+      runtime: params.runtime,
+      abortSignal: params.abortSignal,
+      statusSink: params.statusSink,
+      path,
+      expectedToken: params.account.webhookToken ?? params.account.token,
+    });
+  }
+
+  return () => {
+    stopHeartbeat();
+    stopTransport?.();
+    if (profile?.machineId) {
+      const abort = new AbortController();
+      const timeout = setTimeout(() => abort.abort(), 3000);
+      void heartbeatMachineForAccount({
+        account: params.account,
+        machineId: profile.machineId,
+        runtime: params.runtime,
+        abortSignal: abort.signal,
+        status: "offline",
+      }).finally(() => clearTimeout(timeout));
+    }
+    clearRegisteredMachineProfile(params.account.accountId);
+  };
 }
