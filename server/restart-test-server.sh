@@ -21,5 +21,5 @@ pkill -f "node .*server.mjs" >/dev/null 2>&1 || true
 nohup env TEST_INBOUND_MODE="$INBOUND_MODE" TEST_SERVER_PORT="$PORT" TEST_USERS_FILE="$USERS_FILE" \
   node "$INSTALL_DIR/server/server.mjs" > "$LOG_PATH" 2>&1 &
 
-echo "Vimalinx Server started"
+echo "VimaClawNet Server started"
 echo "log: $LOG_PATH"

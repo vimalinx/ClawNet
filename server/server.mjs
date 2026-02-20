@@ -1841,7 +1841,7 @@ server.listen(Number.isFinite(port) ? port : 18788, bindHost, () => {
   const usersCount = users.size;
   const location = Number.isFinite(port) ? port : 18788;
   // eslint-disable-next-line no-console
-  console.log(`Vimalinx Server listening on http://${bindHost}:${location}`);
+  console.log(`VimaClawNet Server listening on http://${bindHost}:${location}`);
   // eslint-disable-next-line no-console
   console.log(`inbound mode: ${inboundMode}`);
   if (!gatewayUrl && inboundMode === "webhook") {
